@@ -693,7 +693,7 @@ def localRotationAxisToggle(display=0, objects=None):
 			print ('%s is not a PyNode' % obj)
 		if hasAttr(obj, 'displayLocalAxis'):
 			try:
-				obj.displayLocalAxis.set(onOff)
+				obj.displayLocalAxis.set(display)
 			except:
 				warning('%s.displayLocalAxis could not be set' % obj)
 

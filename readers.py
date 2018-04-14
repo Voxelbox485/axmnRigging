@@ -441,11 +441,13 @@ def coneAngleReader(base, target, prefix=None, suffix=None, targetOffset=1.0, co
 	if not hasAttr(target, 'coneAngle%s' % suffix.capitalize()) and not hasAttr(target, 'value%s' % suffix.capitalize()):
 		rb.cbSep(target)
 	
-	if not hasAttr(target, 'coneAngle%s' % suffix.capitalize()):
-		addAttr(target, ln='coneAngle%s' % suffix.capitalize(), at='double', min=1, max=359, dv=coneAngle, k=True)
-	if not hasAttr(target, 'value%s' % suffix.capitalize()):
-		addAttr(target, ln='value%s' % suffix.capitalize(), k=1)
-		target.attr('value%s' % suffix.capitalize()).set(k=0, cb=1)
+	if not hasAttr(axisGroup, 'coneAngle%s' % suffix.capitalize()):
+		addAttr(axisGroup, ln='coneAngle%s' % suffix.capitalize(), at='double', min=1, max=359, dv=coneAngle, k=True)
+	if not hasAttr(axisGroup, 'value%s' % suffix.capitalize()):
+		addAttr(axisGroup, ln='value%s' % suffix.capitalize(), k=1)
+		axisGroup.attr('value%s' % suffix.capitalize()).set(k=0, cb=1)
+	coneAngleAttr = axisGroup.attr( 'coneAngle%s' % suffix.capitalize() )
+	coneValueAttr = axisGroup.attr( 'value%s' % suffix.capitalize() )
 
 	# Angle between
 	angle = createNode('angleBetween', n=names.get('angle', 'rnm_angle'))
@@ -457,7 +459,7 @@ def coneAngleReader(base, target, prefix=None, suffix=None, targetOffset=1.0, co
 	# Multiply
 	mult = createNode('multDoubleLinear', n=names.get('mult', 'rnm_mult'))
 	nodeList.append(mult)
-	target.attr('coneAngle%s' % suffix.capitalize()) >> mult.input1
+	coneAngleAttr >> mult.input1
 	mult.i2.set(0.5)
 	if dev: print mult
 
@@ -480,7 +482,7 @@ def coneAngleReader(base, target, prefix=None, suffix=None, targetOffset=1.0, co
 	rev = createNode('reverse', n=names.get('rev', 'rnm_rev'))
 	nodeList.append(rev)
 	cond.outColor >> rev.input
-	rev.outputX >> target.attr('value%s' % suffix.capitalize())
+	rev.outputX >> coneValueAttr
 	if dev: print rev
 
 	# Cone preview
@@ -511,8 +513,8 @@ def coneAngleReader(base, target, prefix=None, suffix=None, targetOffset=1.0, co
 	delete(coneOri)
 
 	# Expressions
-	radExpression = expression(s= '%s=sind(%s*0.5)' % (previewCone.radius, target.attr('coneAngle%s' % suffix.capitalize())), o=previewCone, ae=1, uc='all', name=names.get('radExpression', 'rnm_radExpression'))
-	heightExpression = expression(s= '%s=cosd(%s*0.5)' % (previewCone.height, target.attr('coneAngle%s' % suffix.capitalize())), o=previewCone, ae=1, uc='all', name=names.get('heightExpression', 'rnm_heightExpression'))
+	radExpression = expression(s= '%s=sind(%s*0.5)' % (previewCone.radius, coneAngleAttr), o=previewCone, ae=1, uc='all', name=names.get('radExpression', 'rnm_radExpression'))
+	heightExpression = expression(s= '%s=cosd(%s*0.5)' % (previewCone.height, coneAngleAttr), o=previewCone, ae=1, uc='all', name=names.get('heightExpression', 'rnm_heightExpression'))
 	transYExpression = expression(s= '%s=(%s/2)' % (previewConeTransform.translateY, previewCone.height), o=previewCone, ae=1, uc='all', name=names.get('transYExpression', 'rnm_transYExpression'))
 	if dev: print radExpression
 	if dev: print heightExpression

@@ -1,6 +1,7 @@
-
-
+from pymel.core import *
+import utils
 import buildRig
+
 class bezierIK(buildRig.rig):
 
 	def __init__(self, fitNode=None, rigNode=None):
@@ -13,234 +14,233 @@ class bezierIK(buildRig.rig):
 			# Put any attributes needed for initialized rigs here
 
 		else:
+			try:
+				# Initialize rigNode
+				# Error Check:
+				
+				# Convert string input to PyNode if neccessary
+				if isinstance(fitNode, str):
+					fitNode = ls(fitNode)[0]
 
-			# Initialize rigNode
-			# Error Check:
-			
-			# Convert string input to PyNode if neccessary
-			if isinstance(fitNode, str):
-				fitNode = ls(fitNode)[0]
+				if fitNode.rigType.get() != 'bezierIK':
+					raise Exception('Incorrect rig type: %s' % fitNode.rigType.get())
 
-			if fitNode.rigType.get() != 'bezierIK':
-				raise Exception('Incorrect rig type: %s' % fitNode.rigType.get())
+				self.crvs = []
 
-			self.crvs = []
-
-			rig.__init__(self, fitNode)
+				buildRig.rig.__init__(self, fitNode)
 
 
 
-			# fitNode attributes
-			doFK = False
-			doOffsetFK = False # end joint orient failure
-			doParametric = True
-			doSplineIK = False
-			# 
-			doStretchLimit = False
-			# 
-			doVolume = False
-
-			doStretchLimit = self.fitNode.stretchLimits.get()
-
-			style = self.fitNode.style.get(asString=True)
-			if style == 'FK Only':
-				doSplineIK = False
-				doParametric = False
-			elif style == 'IK Only':
+				# fitNode attributes
 				doFK = False
-				if doStretchLimit:
-					doSplineIK = True
-			elif style == 'IK to FK' or style == ' IK to FK':
-				doFK = True
-				doOffsetFK = True
-				if doStretchLimit:
-					doSplineIK = True
-			else:
-				doFK=True
-				doSplineIK = True
+				doOffsetFK = False # end joint orient failure
 				doParametric = True
-
-			# if doFK:
-			# 	raise Exception(style)
-
-
-			if not all([doParametric, doSplineIK]):
+				doSplineIK = False
+				# 
 				doStretchLimit = False
-			if not doFK:
-				doOffsetFK = False
+				# 
+				doVolume = False
 
-			jointsList = 	self.fitNode.jointsList.get()
-			numJoints = 	self.fitNode.resultPoints.get()+1
-			pointInput = 	self.fitNode.outputJoints.inputs()[:self.fitNode.resultPoints.get()+2]
+				doStretchLimit = self.fitNode.stretchLimits.get()
 
-			fkShapes = 		self.fitNode.fkShapes.get()
-			ikShapes = 		[self.fitNode.startShape.get(), self.fitNode.endShape.get()]
+				style = self.fitNode.style.get(asString=True)
+				if style == 'FK Only':
+					doSplineIK = False
+					doParametric = False
+				elif style == 'IK Only':
+					doFK = False
+					if doStretchLimit:
+						doSplineIK = True
+				elif style == 'IK to FK' or style == ' IK to FK':
+					doFK = True
+					doOffsetFK = True
+					if doStretchLimit:
+						doSplineIK = True
+				else:
+					doFK=True
+					doSplineIK = True
+					doParametric = True
 
-			tan1 =			self.fitNode.tangent1.get()
-			tan2 =			self.fitNode.tangent2.get()
+				# if doFK:
+				# 	raise Exception(style)
 
-			orientation = self.fitNode.orientation.get(asString=True)
 
-			bindEnd = False
+				if not all([doParametric, doSplineIK]):
+					doStretchLimit = False
+				if not doFK:
+					doOffsetFK = False
 
-			doBind = 		self.fitNode.bind.get()
+				jointsList = 	self.fitNode.jointsList.get()
+				numJoints = 	self.fitNode.resultPoints.get()+1
+				pointInput = 	self.fitNode.outputJoints.inputs()[:self.fitNode.resultPoints.get()+2]
 
-			if not doBind:
+				fkShapes = 		self.fitNode.fkShapes.get()
+				ikShapes = 		[self.fitNode.startShape.get(), self.fitNode.endShape.get()]
+
+				tan1 =			self.fitNode.tangent1.get()
+				tan2 =			self.fitNode.tangent2.get()
+
+				orientation = self.fitNode.orientation.get(asString=True)
+
 				bindEnd = False
 
+				doBind = 		self.fitNode.bind.get()
 
-			# Mirroring
-			if self.fitNode.side.get() == 2:
-				mirror=True
-			else:
-				mirror=False
-
-			if self.fitNode.mirror.get() is False:
-				mirror=False
-
-			# Move rigGroup
-			xform(self.rigGroup, ws=1, m=xform(jointsList[0], q=1, ws=1, m=1))
-
-			# Naming
-			self.globalName = self.fitNode.globalName.get()
-			self.subNames = []
-			subAttrs = listAttr(self.fitNode, st='subName*')
-			for subAttr in subAttrs:
-				self.subNames.append(self.fitNode.attr(subAttr).get())
-
-			# NAMING
-			self.naming(0)
-			self.names = utils.constructNames(self.namesDict)
+				if not doBind:
+					bindEnd = False
 
 
+				# Mirroring
+				if self.fitNode.side.get() == 2:
+					mirror=True
+				else:
+					mirror=False
 
-			# ========================= RigNode Attributes =========================
-			self.rigNode.rigType.set('bezier', l=1)
+				if self.fitNode.mirror.get() is False:
+					mirror=False
 
-			
-			utils.cbSep(self.rigNode)
+				# Move rigGroup
+				xform(self.rigGroup, ws=1, m=xform(jointsList[0], q=1, ws=1, m=1))
 
-			if doFK and not doOffsetFK:
-				addAttr(self.rigNode, ct='publish', k=1, dv=0, min=0, max=1, ln='fkIk', nn='FK/IK')
-				utils.cbSep(self.rigNode, ct='publish')
-				addAttr(self.rigNode, ct='publish', ln='autoVis', nn='FK/IK Auto Vis', at='short', min=0, max=1, dv=1)
-				setAttr(self.rigNode.autoVis, keyable=False, channelBox=True)
-			if doFK:
-				addAttr(self.rigNode, ct='publish', ln='fkVis', nn='FK Vis', at='short', min=0, max=1, dv=1)
-				setAttr(self.rigNode.fkVis, keyable=False, channelBox=True)
-			
-			addAttr(self.rigNode, ct='publish', ln='ikVis', nn='IK Vis', at='short', min=0, max=1, dv=1)
-			setAttr(self.rigNode.ikVis, keyable=False, channelBox=True)
-			
+				# Naming
+				self.globalName = self.fitNode.globalName.get()
+				self.subNames = []
+				subAttrs = listAttr(self.fitNode, st='subName*')
+				for subAttr in subAttrs:
+					self.subNames.append(self.fitNode.attr(subAttr).get())
 
-		
-			if doParametric or doSplineIK:
-				addAttr(self.rigNode, ct='publish', ln='offsetCtrlsVis', at='short', min=0, max=1, dv=0, k=1)
-				setAttr(self.rigNode.offsetCtrlsVis, keyable=False, channelBox=True)
+				# NAMING
+				self.naming(0)
+				self.names = utils.constructNames(self.namesDict)
 
-			utils.cbSep(self.rigNode, ct='publish')
-			# addAttr(self.rigNode, ln='bendCtrlsVis', nn='Bend Ctrl Vis', at='short', min=0, max=1, dv=1, k=1)
-			# setAttr(self.rigNode.bendCtrlsVis, k=0, cb=1)
 
-			addAttr(self.rigNode, ct='publish', ln='tangentCtrlsVis', min=0, max=1, dv=0, at='short', k=1)
-			setAttr(self.rigNode.tangentCtrlsVis, k=0, cb=1)
 
-			addAttr(self.rigNode, ln='tangentsDistanceScaling', softMinValue=0, softMaxValue=1, dv=0.5, k=1)
-			
-			# addAttr(self.rigNode, ln='neutralizeAll', min=0, max=1, dv=1, k=1)
+				# ========================= RigNode Attributes =========================
+				self.rigNode.rigType.set('bezier', l=1)
 
-			if doStretchLimit:
-				utils.cbSep(self.rigNode, ct='publish')
-				addAttr(self.rigNode, ct='publish', ln='stretch', softMinValue=0, softMaxValue=1, dv=1, k=1)
-				addAttr(self.rigNode, ct='publish', ln='squash', softMinValue=0, softMaxValue=1, dv=1, k=1)
-				addAttr(self.rigNode, ct='publish', ln='restLength', min=0.01, dv=1, k=1)
-				# addAttr(self.rigNode, ln='currentNormalizedLength', dv=0)
-				# self.rigNode.currentNormalizedLength.set(k=0, cb=1)
-			if doVolume:
-				utils.cbSep(self.rigNode, ct='publish')
-				addAttr(self.rigNode, ct='publish', ln='volume', min=0, max=1, dv=0.5, keyable=True)
-			
-			if not hasAttr(self.rigNode, 'upAxis'):
+				
 				utils.cbSep(self.rigNode)
-				addAttr(self.rigNode,ln='upAxis', at='enum', enumName='Y=1:Z=2', dv=1, k=1)
 
-			# ========================= Vis Mults =========================
-			# allVis Mults
-			ikVisMult = createNode('multDoubleLinear', n=self.names.get('ikVisMult', 'rnm_ikVisMult'))
-			self.rigNode.allVis >> ikVisMult.i1
-			self.rigNode.ikVis >> ikVisMult.i2
-			self.step(ikVisMult, 'ikVisMult')
-			self.ikVis = ikVisMult.o
+				if doFK and not doOffsetFK:
+					addAttr(self.rigNode, ct='publish', k=1, dv=0, min=0, max=1, ln='fkIk', nn='FK/IK')
+					utils.cbSep(self.rigNode, ct='publish')
+					addAttr(self.rigNode, ct='publish', ln='autoVis', nn='FK/IK Auto Vis', at='short', min=0, max=1, dv=1)
+					setAttr(self.rigNode.autoVis, keyable=False, channelBox=True)
+				if doFK:
+					addAttr(self.rigNode, ct='publish', ln='fkVis', nn='FK Vis', at='short', min=0, max=1, dv=1)
+					setAttr(self.rigNode.fkVis, keyable=False, channelBox=True)
+				
+				addAttr(self.rigNode, ct='publish', ln='ikVis', nn='IK Vis', at='short', min=0, max=1, dv=1)
+				setAttr(self.rigNode.ikVis, keyable=False, channelBox=True)
+				
 
-			if doFK:
-				fkVisMult = createNode('multDoubleLinear', n=self.names.get('fkVisMult', 'rnm_fkVisMult'))
-				self.rigNode.allVis >> fkVisMult.i1
-				self.rigNode.fkVis >> fkVisMult.i2
-				self.step(fkVisMult, 'fkVisMult')
-				self.fkVis = fkVisMult.o
+			
+				if doParametric or doSplineIK:
+					addAttr(self.rigNode, ct='publish', ln='offsetCtrlsVis', at='short', min=0, max=1, dv=0, k=1)
+					setAttr(self.rigNode.offsetCtrlsVis, keyable=False, channelBox=True)
 
-			debugVisMult = createNode('multDoubleLinear', n=self.names.get('debugVisMult', 'rnm_debugVisMult'))
-			self.debugVis = debugVisMult.o
-			self.rigNode.allVis >> debugVisMult.i1
-			self.rigNode.debugVis >> debugVisMult.i2
-			self.step(debugVisMult, 'debugVisMult')
+				utils.cbSep(self.rigNode, ct='publish')
+				# addAttr(self.rigNode, ln='bendCtrlsVis', nn='Bend Ctrl Vis', at='short', min=0, max=1, dv=1, k=1)
+				# setAttr(self.rigNode.bendCtrlsVis, k=0, cb=1)
 
-			if doFK and not doOffsetFK:
-				#=================== FK/IK Autovis Setup =========================
-				self.sectionTag = 'fkIkAutoVis'
+				addAttr(self.rigNode, ct='publish', ln='tangentCtrlsVis', min=0, max=1, dv=0, at='short', k=1)
+				setAttr(self.rigNode.tangentCtrlsVis, k=0, cb=1)
 
-				fkIkAutoMult = createNode('multDoubleLinear', n=self.names.get('fkIkAutoMult', 'rnm_fkIkAutoMult'))
-				self.rigNode.allVis >> fkIkAutoMult.i1
-				self.rigNode.autoVis >> fkIkAutoMult.i2
-				self.step(fkIkAutoMult, 'fkIkAutoMult')
+				addAttr(self.rigNode, ln='tangentsDistanceScaling', softMinValue=0, softMaxValue=1, dv=0.5, k=1)
+				
+				# addAttr(self.rigNode, ln='neutralizeAll', min=0, max=1, dv=1, k=1)
 
-				fkCond = createNode('condition', n=self.names.get('fkCond', 'rnm_fkCond'))
-				fkCond.operation.set(4)
-				fkCond.secondTerm.set(0.9)
-				fkCond.colorIfTrue.set(1,1,1)
-				fkCond.colorIfFalse.set(0,0,0)
-				connectAttr(self.rigNode.fkIk, fkCond.firstTerm)
-				self.step(fkCond, 'fkCond')
+				if doStretchLimit:
+					utils.cbSep(self.rigNode, ct='publish')
+					addAttr(self.rigNode, ct='publish', ln='stretch', softMinValue=0, softMaxValue=1, dv=1, k=1)
+					addAttr(self.rigNode, ct='publish', ln='squash', softMinValue=0, softMaxValue=1, dv=1, k=1)
+					addAttr(self.rigNode, ct='publish', ln='restLength', min=0.01, dv=1, k=1)
+					# addAttr(self.rigNode, ln='currentNormalizedLength', dv=0)
+					# self.rigNode.currentNormalizedLength.set(k=0, cb=1)
+				if doVolume:
+					utils.cbSep(self.rigNode, ct='publish')
+					addAttr(self.rigNode, ct='publish', ln='volume', min=0, max=1, dv=0.5, keyable=True)
+				
+				if not hasAttr(self.rigNode, 'upAxis'):
+					utils.cbSep(self.rigNode)
+					addAttr(self.rigNode,ln='upAxis', at='enum', enumName='Y=1:Z=2', dv=1, k=1)
 
-				ikCond = createNode('condition', n=self.names.get('ikCond', 'rnm_ikCond'))
-				fkCond.operation.set(4)
-				fkCond.secondTerm.set(0.9)
-				fkCond.colorIfTrue.set(1,1,1)
-				fkCond.colorIfFalse.set(0,0,0)
-				connectAttr(self.rigNode.fkIk, ikCond.firstTerm)
-				self.step(ikCond, 'ikCond')
+				# ========================= Vis Mults =========================
+				# allVis Mults
+				ikVisMult = createNode('multDoubleLinear', n=self.names.get('ikVisMult', 'rnm_ikVisMult'))
+				self.rigNode.allVis >> ikVisMult.i1
+				self.rigNode.ikVis >> ikVisMult.i2
+				self.step(ikVisMult, 'ikVisMult')
+				self.ikVis = ikVisMult.o
 
-				fkAutoCond = createNode('condition', n=self.names.get('fkAutoCond', 'rnm_fkAutoCond'))
-				self.fkVis = fkAutoCond.outColorR
-				fkAutoCond.operation.set(0)
-				fkAutoCond.secondTerm.set(1)
-				connectAttr(fkIkAutoMult.o, fkAutoCond.firstTerm)
-				connectAttr(fkCond.outColorR, fkAutoCond.colorIfTrueR)
-				connectAttr(fkVisMult.o, fkAutoCond.colorIfFalseR)
-				connectAttr(fkVisMult.o, fkAutoCond.colorIfFalseG)
-				self.step(fkAutoCond, 'fkAutoCond')
+				if doFK:
+					fkVisMult = createNode('multDoubleLinear', n=self.names.get('fkVisMult', 'rnm_fkVisMult'))
+					self.rigNode.allVis >> fkVisMult.i1
+					self.rigNode.fkVis >> fkVisMult.i2
+					self.step(fkVisMult, 'fkVisMult')
+					self.fkVis = fkVisMult.o
 
-				ikAutoCond = createNode('condition', n=self.names.get('ikAutoCond', 'rnm_ikAutoCond'))
-				self.ikVis = ikAutoCond.outColorR
-				ikAutoCond.operation.set(0)
-				ikAutoCond.secondTerm.set(1)
-				connectAttr(fkIkAutoMult.o, ikAutoCond.firstTerm)
-				connectAttr(ikCond.outColorR, ikAutoCond.colorIfTrueR)
-				connectAttr(ikVisMult.o, ikAutoCond.colorIfFalseR)
-				connectAttr(ikVisMult.o, ikAutoCond.colorIfFalseG)
-				self.step(ikAutoCond, 'ikAutoCond')
+				debugVisMult = createNode('multDoubleLinear', n=self.names.get('debugVisMult', 'rnm_debugVisMult'))
+				self.debugVis = debugVisMult.o
+				self.rigNode.allVis >> debugVisMult.i1
+				self.rigNode.debugVis >> debugVisMult.i2
+				self.step(debugVisMult, 'debugVisMult')
 
-			# ========================= World Group =========================
-			worldGroup = createNode('transform', n=self.names.get('worldGroup', 'rnm_worldGroup'), p=self.rigGroup)
-			self.worldGroup = worldGroup
-			self.ikVis.connect(self.worldGroup.v)
+				if doFK and not doOffsetFK:
+					#=================== FK/IK Autovis Setup =========================
+					self.sectionTag = 'fkIkAutoVis'
 
-			self.step(worldGroup, 'worldGroup')
-			worldGroup.inheritsTransform.set(0)
-			xform(worldGroup, rp=[0,0,0], ro=[0,0,0], ws=1)
+					fkIkAutoMult = createNode('multDoubleLinear', n=self.names.get('fkIkAutoMult', 'rnm_fkIkAutoMult'))
+					self.rigNode.allVis >> fkIkAutoMult.i1
+					self.rigNode.autoVis >> fkIkAutoMult.i2
+					self.step(fkIkAutoMult, 'fkIkAutoMult')
+
+					fkCond = createNode('condition', n=self.names.get('fkCond', 'rnm_fkCond'))
+					fkCond.operation.set(4)
+					fkCond.secondTerm.set(0.9)
+					fkCond.colorIfTrue.set(1,1,1)
+					fkCond.colorIfFalse.set(0,0,0)
+					connectAttr(self.rigNode.fkIk, fkCond.firstTerm)
+					self.step(fkCond, 'fkCond')
+
+					ikCond = createNode('condition', n=self.names.get('ikCond', 'rnm_ikCond'))
+					fkCond.operation.set(4)
+					fkCond.secondTerm.set(0.9)
+					fkCond.colorIfTrue.set(1,1,1)
+					fkCond.colorIfFalse.set(0,0,0)
+					connectAttr(self.rigNode.fkIk, ikCond.firstTerm)
+					self.step(ikCond, 'ikCond')
+
+					fkAutoCond = createNode('condition', n=self.names.get('fkAutoCond', 'rnm_fkAutoCond'))
+					self.fkVis = fkAutoCond.outColorR
+					fkAutoCond.operation.set(0)
+					fkAutoCond.secondTerm.set(1)
+					connectAttr(fkIkAutoMult.o, fkAutoCond.firstTerm)
+					connectAttr(fkCond.outColorR, fkAutoCond.colorIfTrueR)
+					connectAttr(fkVisMult.o, fkAutoCond.colorIfFalseR)
+					connectAttr(fkVisMult.o, fkAutoCond.colorIfFalseG)
+					self.step(fkAutoCond, 'fkAutoCond')
+
+					ikAutoCond = createNode('condition', n=self.names.get('ikAutoCond', 'rnm_ikAutoCond'))
+					self.ikVis = ikAutoCond.outColorR
+					ikAutoCond.operation.set(0)
+					ikAutoCond.secondTerm.set(1)
+					connectAttr(fkIkAutoMult.o, ikAutoCond.firstTerm)
+					connectAttr(ikCond.outColorR, ikAutoCond.colorIfTrueR)
+					connectAttr(ikVisMult.o, ikAutoCond.colorIfFalseR)
+					connectAttr(ikVisMult.o, ikAutoCond.colorIfFalseG)
+					self.step(ikAutoCond, 'ikAutoCond')
+
+				# ========================= World Group =========================
+				worldGroup = createNode('transform', n=self.names.get('worldGroup', 'rnm_worldGroup'), p=self.rigGroup)
+				self.worldGroup = worldGroup
+				self.ikVis.connect(self.worldGroup.v)
+
+				self.step(worldGroup, 'worldGroup')
+				worldGroup.inheritsTransform.set(0)
+				xform(worldGroup, rp=[0,0,0], ro=[0,0,0], ws=1)
 
 
-			try:
 				#=========================== FK Setup =================================
 				# if doFK:
 				# 	fkGroup = self.buildFkSetup(shapes=[fkShapes[0]], transforms=[jointsList[0]], mirror=mirror)
@@ -278,7 +278,7 @@ class bezierIK(buildRig.rig):
 					delete(bezierTransforms)
 				
 				# Chest orientation
-				endOriCtrlSS = spaceSwitch(
+				endOriCtrlSS = buildRig.spaceSwitch(
 					constraintType='orient',
 					controller = self.bendCtrls[1],
 					constrained= self.bendCtrls[1].const.get(),
@@ -494,7 +494,7 @@ class bezierIK(buildRig.rig):
 							elif point == results[-1] :
 								self.matrixConstraint(point, splineRetarget, t=1, s=1, offset=False)
 								self.matrixConstraint(self.bendCtrls[-1], splineRetarget, t=0, r=1, offset=False)
-								# endSS = simpleSpaceSwitch(
+								# endSS = buildRig.simpleSpaceSwitch(
 								# 	constraintType='orient',
 								# 	controller=self.fkCtrls[i],
 								# 	constrained=self.fkCtrls[i],
@@ -550,7 +550,7 @@ class bezierIK(buildRig.rig):
 						self.rigNode.fkIk.connect(rigEntranceScaleBlend.blender)
 						rigEntranceScaleBlend.output.connect(rigEntrance.scale)
 						
-						fkIkStartSS = simpleSpaceSwitch(
+						fkIkStartSS = buildRig.simpleSpaceSwitch(
 							constraintType='parent',
 							constrained= rigEntrance,
 							prefix = self.names.get('fkIkStartSS', 'rnm_fkIkStartSS'),
@@ -578,7 +578,7 @@ class bezierIK(buildRig.rig):
 						self.step(rigExit, 'rigExit')
 						utils.snap(results[0], rigExit)
 
-						fkIkEndSS = simpleSpaceSwitch(
+						fkIkEndSS = buildRig.simpleSpaceSwitch(
 							constraintType='parent',
 							constrained= rigExit,
 							prefix = self.names.get('fkIkEndSS', 'rnm_fkIkEndSS'),
@@ -608,7 +608,7 @@ class bezierIK(buildRig.rig):
 							self.step(switch, 'switch')
 							switches.append(switch)
 
-							fkIkSwitchSS = simpleSpaceSwitch(
+							fkIkSwitchSS = buildRig.simpleSpaceSwitch(
 								constrained= switch,
 								controller=self.rigNode.fkIk,
 								targets=[self.fkCtrls[i], results[i]],

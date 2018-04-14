@@ -1,4 +1,5 @@
-
+from pymel.core import *
+import utils
 import buildRig
 class midBendChain(buildRig.rig):
 
@@ -26,7 +27,7 @@ class midBendChain(buildRig.rig):
 
 			self.crvs = []
 
-			rig.__init__(self, fitNode)
+			buildRig.rig.__init__(self, fitNode)
 
 			jointsList = fitNode.jointsList.get()
 			# Move rigGroup

@@ -1,4 +1,5 @@
-
+from pymel.core import *
+import utils
 import buildRig
 class chain(buildRig.rig):
 	'''Options:
@@ -39,7 +40,7 @@ class chain(buildRig.rig):
 			self.offsetCtrls = []
 			self.crvs = []
 
-			rig.__init__(self, fitNode)
+			buildRig.rig.__init__(self, fitNode)
 
 
 			# fitNode attributes

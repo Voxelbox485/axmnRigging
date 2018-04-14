@@ -2942,9 +2942,11 @@ class rig:
 				mirrorStart=(mirror[i] if isinstance(mirror, list) else mirror)
 				)
 			ctrls.append(ctrl)
-			if mirror and bezChain: 
-				ctrl.mirror.get().r.set(0,0,0)
-				ctrl.mirror.get().s.set(1,1,-1)
+			if i==0:
+				if mirror and bezChain:
+					if hasAttr(ctrl, 'mirror'):
+						ctrl.mirror.get().r.set(0,0,0)
+						ctrl.mirror.get().s.set(1,1,-1)
 			# col.setViewportRGB(ctrl, (0.5,0.5,0.5))
 			controller.controlsVis.connect(ctrl.buf.get().v)
 
@@ -3977,9 +3979,10 @@ class rig:
 
 		
 		# Returns shortName string when there's a name clash.  '#' should prevent further issues
+		print crv
 		ikh, eff = ikHandle(sj=splineJnts[0], ee=splineJnts[-1], createCurve=0, parentCurve=0, curve=crv, sol='ikSplineSolver', snapHandleToEffector=1, rootTwistMode=1, n=self.names.get('ikh','rnm_ikh#'))
-		if len(ls(ikh)) > 1:
-			raise Exception('Ik handle name clash')
+		# if len(ls(ikh)) > 1:
+		# 	raise Exception('Ik handle name clash')
 		ikh = PyNode(ikh)
 		self.step(ikh, 'ikh')
 		ikh.hide()
@@ -4030,7 +4033,7 @@ class rig:
 
 
 	# ============================================== PARAMETRIC CURVE ==============================================
-	def buildParametricCurveRigSetup(self, crv, paramList=None, paramRange=None, nameVar=None, numJoints=None, mirror=False, par=None, const=None, stretch=True):
+	def buildParametricCurveRigSetup(self, crv, paramList=None, nameVar=None, numJoints=None, mirror=False, par=None, const=None, stretch=True):
 		if self.dev: print '# buildParametricCurveRigSetup'
 		# TODO
 		# It'd be better to be allowed to set up multiple partitions at once somehow.  This is kinda unfinished otherwise

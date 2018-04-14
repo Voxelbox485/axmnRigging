@@ -1,5 +1,7 @@
-
+from pymel.core import *
+import utils
 import buildRig
+
 class threePointIK(buildRig.rig):
 
 	def __init__(self, fitNode=None, rigNode=None):
@@ -27,7 +29,7 @@ class threePointIK(buildRig.rig):
 
 
 
-			rig.__init__(self, fitNode)
+			buildRig.rig.__init__(self, fitNode)
 
 			try:
 				# ========================= Store Nodes =========================
@@ -261,7 +263,7 @@ class threePointIK(buildRig.rig):
 				fkRigGroup = self.buildFkSetup(transforms=self.fitJoints, shapes=fkShapes, mirror=fkMirror)
 				self.fkAutoCond >> fkRigGroup.v
 
-				self.spaceSwitches[self.fkCtrls[0]] = spaceSwitch(
+				self.spaceSwitches[self.fkCtrls[0]] = buildRig.spaceSwitch(
 					controller=self.fkCtrls[0],
 					constraintType='orient',
 					constrained=self.fkCtrls[0].const.get(),
@@ -271,7 +273,7 @@ class threePointIK(buildRig.rig):
 					labels=['World', 'Parent'])
 				self.spaceSwitches[self.fkCtrls[0]].setDefaultBlend(1)
 
-				self.spaceSwitches[self.fkCtrls[2]] = spaceSwitch(
+				self.spaceSwitches[self.fkCtrls[2]] = buildRig.spaceSwitch(
 					controller=self.fkCtrls[2],
 					constraintType='orient',
 					constrained=self.fkCtrls[2].const.get(),
@@ -297,7 +299,7 @@ class threePointIK(buildRig.rig):
 				self.ikAutoCond >> ikRigGroup.v
 
 
-				self.spaceSwitches[self.ikCtrls[2]] = spaceSwitch(
+				self.spaceSwitches[self.ikCtrls[2]] = buildRig.spaceSwitch(
 					controller=self.ikCtrls[2],
 					constraintType='parent',
 					constrained=self.ikCtrls[2].const.get(),
@@ -342,7 +344,7 @@ class threePointIK(buildRig.rig):
 					# switchTwist = createNode('transform', n=self.names.get('switchTwist', 'rnm_switchTwist'))
 					# self.step(switchTwist, 'switchTwist')
 					# switchTwists.append(switchTwist)
-					switchTwists.append(twistExtractorMatrix(switchJnt, switchJnt.getParent(), switchJnt))
+					switchTwists.append(buildRig.twistExtractorMatrix(switchJnt, switchJnt.getParent(), switchJnt))
 
 				makeIdentity(switchJoints[0], apply=1, t=1, r=1, s=1, n=0, pn=1)
 				# raise
@@ -409,7 +411,7 @@ class threePointIK(buildRig.rig):
 					self.rigNode.tangentsDistanceScaling.connect(bezierRigGroup.tangentsDistanceScaling)
 					self.rigNode.neutralizeAll.connect(bezierRigGroup.neutralizeAll)
 
-					# pvPinningSS = spaceSwitch(
+					# pvPinningSS = buildRig.spaceSwitch(
 					# 	constraintType='point',
 					# 	controller = self.bendCtrls[1],
 					# 	constrained= self.bendCtrls[1].extra.get(),
@@ -613,14 +615,14 @@ class threePointIK(buildRig.rig):
 					
 					# scaleResults0 = 
 
-					scaleResults0 = self.buildScaleLengthSetup(scaleInputs=aimRig0Ctrls, nodes=aimRigGroup0.results.get(), settingsNode=self.rigNode)
-					scaleResults1 = self.buildScaleLengthSetup(scaleInputs=aimRig1Ctrls, nodes=aimRigGroup1.results.get(), settingsNode=self.rigNode)
+					# scaleResults0 = self.buildScaleLengthSetup(scaleInputs=aimRig0Ctrls, nodes=aimRigGroup0.results.get(), settingsNode=self.rigNode)
+					# scaleResults1 = self.buildScaleLengthSetup(scaleInputs=aimRig1Ctrls, nodes=aimRigGroup1.results.get(), settingsNode=self.rigNode)
 
-					results = scaleResults0
-					results.extend(scaleResults1)
+					# results = scaleResults0
+					# results.extend(scaleResults1)
 
-					# results = aimRigGroup0.results.get()
-					# results.extend(aimRigGroup1.results.get())
+					results = aimRigGroup0.results.get()
+					results.extend(aimRigGroup1.results.get())
 
 
 				elif doMidBend:
@@ -752,7 +754,9 @@ class threePointIK(buildRig.rig):
 
 				
 				self.rigExit = createNode('transform', n=self.names.get('rigExit', 'rnm_rigExit'), p=self.rigGroup)
+				# This doesn't work when its just switch joints
 				self.matrixConstraint(results[-1].getParent(), self.rigExit, t=1, offset=False)
+				# self.matrixConstraint(results[-1], self.rigExit, t=1, r=1, s=1, offset=False)
 				self.matrixConstraint(switchJoints[2], self.rigExit, t=0, r=1, s=1, offset=False)
 				self.step(self.rigExit, 'rigExit')
 
@@ -772,6 +776,7 @@ class threePointIK(buildRig.rig):
 				else:
 					self.buildFootRollSetup(self.fitNode.subNode.get())
 
+				self.rigNode.fkIk.set(1)
 			finally:
 				#=========================== Finalize =================================
 
@@ -1029,7 +1034,7 @@ class threePointIK(buildRig.rig):
 		
 		# switch
 
-		fkIkSwitchSS = simpleSpaceSwitch(
+		fkIkSwitchSS = buildRig.simpleSpaceSwitch(
 			constraintType='parent',
 			constrained= rigGroup,
 			prefix = names.get('fkIkSwitch', 'rnm_fkIkSwitch'),
@@ -1061,7 +1066,7 @@ class threePointIK(buildRig.rig):
 		# fkIkCtrlSwitch = createNode('transform', n=names.get('fkIkCtrlSwitch', 'rnm_fkIkCtrlSwitch'), p=rigGroup)
 		# self.step(fkIkCtrlSwitch, 'fkIkCtrlSwitch')
 		
-		# fkIkDestSwtichSS = spaceSwitch(
+		# fkIkDestSwtichSS = buildRig.spaceSwitch(
 		# 	constraintType='parent',
 		# 	controller = fkIkCtrlSwitch,
 		# 	constrained= fkIkCtrlSwitch,
@@ -1353,7 +1358,7 @@ class threePointIK(buildRig.rig):
 			self.rigNode.upAxis.connect(ankle.upAxis)
 			
 
-			# toeSourceSS = spaceSwitch(
+			# toeSourceSS = buildRig.spaceSwitch(
 			# 	constraintType='point',
 			# 	controller = toeSource,
 			# 	constrained= toeSource,
@@ -1383,7 +1388,7 @@ class threePointIK(buildRig.rig):
 				self.step(extendSwitch, 'extendSwitch')
 
 			
-				extendSwitchSS = simpleSpaceSwitch(
+				extendSwitchSS = buildRig.simpleSpaceSwitch(
 				constraintType='parent',
 				constrained= extendSwitch,
 				prefix = names.get('toeExtendSS', 'rnm_toeExtendSS'),
@@ -1411,7 +1416,7 @@ class threePointIK(buildRig.rig):
 			utils.snap(static, fkIkSwitch)
 			self.step(fkIkSwitch, 'fkIkSwitch')
 
-			fkIkSwitchSS = simpleSpaceSwitch(
+			fkIkSwitchSS = buildRig.simpleSpaceSwitch(
 				constraintType='parent',
 				constrained= fkIkSwitch,
 				prefix = names.get('fkIkSwitchSS', 'rnm_fkIkSwitchSS'),
@@ -1643,6 +1648,7 @@ class threePointIK(buildRig.rig):
 			'aimIkGroup':         		{ 'desc': subName,	'side':	side,		'warble': 'rigGroup',	'other': ['aimIK'],					'type': 'transform' },
 			'aimIkControlsGroup': 		{ 'desc': subName,	'side':	side,		'warble': 'grp',		'other': ['controls', 'aimIK'],		'type': 'transform' },
 			'aimIK':               		{ 'desc': subName,	'side':	side,		'warble': None,			'other': ['ctrl', 'aimIK'],						'type': 'transform' },
+			'offsetCtrl':               { 'desc': globalName,	'side':	side,		'warble': None,			'other': [n],						'type': 'transform' },
 			
 			'aimIkResultGroup':   		{ 'desc': globalName,	'side':	side,		'warble': 'grp',		'other': ['resultGroup', 'aimIK'],			'type': 'transform' },
 			'startResult':        		{ 'desc': subName,	'side':	side,		'warble': 'trans',		'other': ['startResult', 'aimIK'],			'type': 'transform' },
@@ -1692,4 +1698,6 @@ class threePointIK(buildRig.rig):
 			'ctrlDistance':          	{ 'desc': subName,	'side':	side,		'warble': 'dist',		'other': ['ctrl', 'bend'],			'type': 'distanceBetween' },
 			'staticDistance':        	{ 'desc': subName,	'side':	side,		'warble': 'dist',		'other': ['static', 'bend'],			'type': 'distanceBetween' },
 			'bendCtrlDistNormalize': 	{ 'desc': subName,	'side':	side,		'warble': 'div',		'other': ['bendCtrl', 'normalize', 'bend'],			'type': 'multiplyDivide' },		
+
+
 		}

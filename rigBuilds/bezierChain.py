@@ -1,4 +1,5 @@
-
+from pymel.core import *
+import utils
 import buildRig
 class bezierChain(buildRig.rig):
 
@@ -26,7 +27,7 @@ class bezierChain(buildRig.rig):
 
 			self.crvs = []
 
-			rig.__init__(self, fitNode)
+			buildRig.rig.__init__(self, fitNode)
 
 			jointsList = fitNode.jointsList.get()
 			# Move rigGroup
@@ -69,7 +70,7 @@ class bezierChain(buildRig.rig):
 			if hasAttr(self.fitNode, 'doBias'):
 				doBias = bool(self.fitNode.doBias.get())
 
-			inbetweenJoints = 2
+			inbetweenJoints = 3
 			if hasAttr(self.fitNode, 'inbetweenJoints'):
 				inbetweenJoints = self.fitNode.inbetweenJoints.get()
 
@@ -265,7 +266,7 @@ class bezierChain(buildRig.rig):
 				#=========================== Bend Setup =================================
 				# bendRigGroup = self.buildMidBendCurveSetup(transforms=self.fkCtrls, follow=True, shapes=ikShapes, controller=self.rigNode, mirror=mirror)
 
-				if self.dev: print 'Control uValues: %s' % bezierRigGroup.uValues.get()
+				# if self.dev: print 'Control uValues: %s' % (bezierRigGroup.uValues.get())
 				
 				crvPathRig = self.buildCurvePartitionsSetup(
 					self.crvs[0], 
@@ -296,7 +297,7 @@ class bezierChain(buildRig.rig):
 				if fkTwist:
 					for i in range(len(jointsList)):
 						twistSettings = self.socket(self.fkCtrls[i])
-						twistExtractorMatrix(self.fkCtrls[i], (self.fkCtrls[i].buf.get()), settingsNode=twistSettings)
+						buildRig.twistExtractorMatrix(self.fkCtrls[i], (self.fkCtrls[i].buf.get()), settingsNode=twistSettings)
 						twistSettings.mult.set(-1)
 						twistSettingsList.append(twistSettings)
 			

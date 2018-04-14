@@ -65,22 +65,24 @@ class axmn_batch:
 
 		# ================================================= DATA ========================================================= 
 
-		# 
-		# AutoComplete Options
-		self.defaultAutoCompleteList = []
-		self.sortedAutoCompleteList = []
-		self.autoCompleteList = []
+		# Defaults
+		self.writeInMode = 'attributes' #default writein setting ('attributes' or 'nodes')
 		self.autoSorted = False
 		self.useShortNames = False
 		self.searchSelected = False
-		self.writeInMode = 'attributes' #default writein setting ('attributes' or 'nodes')
-		self.resultListExpanded = True
-		self.resultListMaxHeight = 0
-		self.AC_divider = '***'
+		self.resultListMaxHeight = 0 # 0: No max
 		self.lsLimit = 500 # Will stop node lookup after a certain point in large scenes
+		
+		# Data Storage
+		self.defaultAutoCompleteList = []
+		self.sortedAutoCompleteList = []
+		self.autoCompleteList = []
+		self.resultListExpanded = True
+		self.AC_divider = '***'
 		self.historyButtons = []
 		self.sequence = False # Determines whether next connection will move the history forward (for insert nodes)
 	
+		# Node creation naming dictionary
 		self.typeDict = {
 			'multDoubleLinear'	:	'mdl',
 			'multiplyDivide'	:	'mdv',
@@ -176,7 +178,8 @@ class axmn_batch:
 
 	def UI(self, p=None):
 		'''Does the work of initializing the UI. Individual sections handled by other defs for easy reordering and such
-		Potentially useful icons
+		
+		Potentially useful icons:
 		Dash_Expand.png ( > )
 		Dash_Expand_150.png
 		Dash_Expand_200.png
@@ -212,7 +215,9 @@ class axmn_batch:
 		polyCreateUVShell.png (panels add)
 
 		absolute.png(square cross)
+
 		'''
+
 		if not p is None:
 			self.everything = verticalLayout(p=p)
 		else:
@@ -331,13 +336,12 @@ class axmn_batch:
 					self.histBackButton = iconTextButton(
 					image = 'Dash_Expand.png',
 					style='iconOnly',
-					rotation=3.14,
+					rotation=3.14, # Turned
 					bgc = [0.2,0.2,0.2],
 					enable=0,
 					c = Callback(self.histBack)
 					)
 				else:
-					# Prev history button
 					self.histBackButton = iconTextButton(
 					l='<<',
 					style='textOnly',
@@ -386,6 +390,8 @@ class axmn_batch:
 		self.stackVerticalLayout(histColumn)
 
 		return histColumn
+
+
 
 	def textListsUI(self):
 		# TextLists row
@@ -500,6 +506,7 @@ class axmn_batch:
 							inFrameColumn.attachNone(buttonRow, 'top')
 							inFrameColumn.attachForm(buttonRow, 'bottom', 5)
 
+
 	def autoCompleteUI(self):
 		autoCompleteMenuColumn = horizontalLayout()
 		with autoCompleteMenuColumn:
@@ -519,7 +526,7 @@ class axmn_batch:
 			# 	c=Callback(self.writeInInsert)
 			# 	)
 			# Check version before using icons
-			if versions.current() > versions.v2018:
+			if versions.current() > versions.v2017:
 				insertFieldButton = iconTextButton(
 				style='iconOnly',
 				image = 'Dash_Expand.png',
@@ -669,11 +676,37 @@ class axmn_batch:
 			
 			nodeCommandsColumn = verticalLayout()
 			with nodeCommandsColumn:	
-
-				# transferOutputsButton
-				
+				# Cast nodes
 				row = horizontalLayout(spacing=0, ratios=[1,4], height=self.buttonHeight+8)
 				with row:
+
+				
+					iconTextButton(
+						style = 'textOnly',
+						rpt = True,
+						l='',
+						annotation = 'Transfer all Inputs and Outputs to new node.',
+						height = self.buttonHeight-5,
+						# width = self.buttonHeight-5,
+						flat=1,
+						bgc=(nodeCommandsColor),
+						c=Callback(self.castNodes)
+						)
+					iconTextButton(
+						style = 'iconAndTextCentered',
+						rpt = True,
+						l = 'Cast Node',
+						annotation = 'Transfer all Inputs and Outputs to new node.',
+						height = self.buttonHeight,
+						bgc=(nodeCommandsColor),
+						c=Callback(self.castNodes)
+						)
+									
+				# constrain lists
+				row = horizontalLayout(spacing=0, ratios=[1,4], height=self.buttonHeight+8)
+				with row:
+
+				
 					iconTextButton(
 						style = 'textOnly',
 						rpt = True,
@@ -694,7 +727,7 @@ class axmn_batch:
 						bgc=(nodeCommandsColor),
 						c=Callback(self.constrainLists)
 						)
-				
+
 				# parentButton
 				row = horizontalLayout(spacing=0, ratios=[1,4], height=self.buttonHeight+8)
 				with row:
@@ -746,24 +779,18 @@ class axmn_batch:
 				for node in nodesDict.keys():
 					row = horizontalLayout(spacing=0, ratios=[1,4], height=self.buttonHeight+8)
 					with row:
-						iconTextButton(
-							style = 'iconAndTextCentered',
-							i = nodesDict[node][0],
-							annotation = 'Insert %s' % node,
-							height = self.buttonHeight-5,
-							# width = self.buttonHeight-5,
-							flat=1,
-							bgc=(.3,.3,.3),
-							c=Callback(self.insertNodes, nodesDict[node][1])
-							)
-						iconTextButton(
-							style = 'iconAndTextCentered',
-							l = node,
-							annotation = 'Insert %s' % node,
-							height = self.buttonHeight,
-							bgc=(.3,.3,.3),
-							c=Callback(self.insertNodes, nodesDict[node][1])
-							)
+						annotataion = 'Insert %s' % node
+						icon = nodesDict[node][0]
+						label = node
+						bgc = (0.3,0.3,0.3)
+						c = Callback(self.insertNodes, nodesDict[node][1])
+						# dcc = Callback(self.createNodes, nodesDict[node][1])
+
+						iconTextButton(style = 'iconAndTextCentered', i = icon, annotation = annotataion, height = self.buttonHeight-5, flat=1, bgc=bgc, c=c)
+						iconTextButton(style = 'iconAndTextCentered', l = label, annotation = annotataion, height = self.buttonHeight, bgc=bgc, c=c)
+				
+				separator(style='none', height=10)
+
 			return nodesFrame
 
 
@@ -917,8 +944,16 @@ class axmn_batch:
 		self.sequence = True
 		self.updateHistUI()
 
-
-
+	def createNodes(self, nodeType):
+		if self.dev: print '\ncreateNodes'
+		pass
+		# insertNodes = []
+		# for node in inputList:
+		# 	# generate a list of names for all inbetween node names
+		# 	nodeName = '%s_%s_%s' % (line[1].nodeName(), self.typeDict.get(nodeType, nodeType), line[1].attrName())
+		# 	print nodeName
+		# 	node = createNode(nodeType, n=nodeName)
+		# 	insertNodes.append(node)
 	# -------------------
 	# TODO
 
@@ -1111,6 +1146,42 @@ class axmn_batch:
 		if len(warnList):
 			for warn in warnList:
 				warning('Attributes could not be connected: %s >> %s' % (warn[0], warn[1]))
+
+	def castNodes(self):
+		if self.dev: print '\nCast Nodes'
+		# For each connection, do a matrixConstraint based on inputs.
+		# t = translate
+		# r = rotate
+		# s = scale
+		# All will except 3-item tuples of bools (for just rx, etc)
+
+		connections = self.getConnectionPattern(attributes=False)
+		warnList = []
+
+		for conn in connections:
+			locked = []
+			# try:
+			for c in conn:
+				# 
+				for i, attribute in enumerate(listAttr(c, locked=True)):
+					locked.append(c.attr(attribute))
+					c.attr(attribute).set(l=0)
+
+			nodeCast(conn[0], conn[1], copyDynamicAttrs=True)
+			# except:
+			# 	warnList.append([conn[0], conn[1]])
+
+			# finally:
+			for l in locked:
+				l.set(l=1)
+
+
+		if len(warnList):
+			for warn in warnList:
+				warning('Nodes could not be cast: %s >> %s' % (warn[0], warn[1]))
+
+		self.selectAllItemsInList(listIndex=1)
+
 
 
 	def constrainLists(self, t=True, r=True, s=True, force=False):
@@ -1593,8 +1664,8 @@ class axmn_batch:
 								warning('Not added. Current state matches previous state.')
 								break
 					except:
-						warning('Not added. Error detected.')
-						# pass
+						# warning('Not added. Error detected.')
+						pass
 
 			if add:
 				# Copy a new version of the current list and add it to the end of the history lineup
@@ -2201,7 +2272,7 @@ class axmn_batch:
 		for index in selIndex:
 			otherItemList.append(itemList[index])
 			itemList.remove(itemList[index])
-		pass
+
 
 
 	def getSelectedListItems(self, listIndex):
@@ -2262,7 +2333,7 @@ class axmn_batch:
 		selItems = self.textLists[listIndex].getSelectItem()
 		self.itemLists[self.hIndex][listIndex].reverse()
 		self.updateLists()
-		textList.setSelectItem(selItems)
+		self.textLists[listIndex].setSelectItem(selItems)
 
 	def segregatedSort(self, inputList):
 		'''TODO

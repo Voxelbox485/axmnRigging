@@ -9,6 +9,7 @@ reload(rb)
 
 
 
+
 '''
 ToDo:
 
@@ -1256,7 +1257,7 @@ class fitSkeleton:
 			Joint Labels
 		'''
 		try:
-			self.fitGroup = self.skeleNode.fitGroup.get()
+			self.fitGroup = self.skeleNode.fitGroup.inputs()[0]
 		except:
 			self.fitGroup, fitGroupHist = circle(n=names.get('fit', 'rnm_fit'), nr=[0, 1, 0], ch=True)
 			parent(self.fitGroup, self.lastOffset)
@@ -1282,7 +1283,7 @@ class fitSkeleton:
 
 		
 
-
+		print self.fitGroup
 		if not hasAttr(self.fitGroup, 'controlScale'):
 			rb.cbSep(self.fitGroup)
 			addAttr(self.fitGroup, ln='controlScale', min=0, dv=1, k=1) # Overall controls scaling
@@ -1305,7 +1306,7 @@ class fitSkeleton:
 		# ========================================= Fit Skeleton ==========================================
 		
 		try:
-			self.fitSkeletonGroup = self.skeleNode.fitSkeletonGroup.get()
+			self.fitSkeletonGroup = self.skeleNode.fitSkeletonGroup.inputs()[0]
 		except:
 			self.fitSkeletonGroup = createNode('transform', n=names.get('fitSkeleton', 'rnm_fitSkeleton'), p=self.fitGroup)
 			self.freezeList.append(self.fitSkeletonGroup)
@@ -1317,7 +1318,7 @@ class fitSkeleton:
 		# ========================================= Symmetry Group =======================================
 
 		try:
-			self.symmetryGroup = self.skeleNode.symmetryGroup.get()
+			self.symmetryGroup = self.skeleNode.symmetryGroup.inputs()[0]
 		except:
 			self.symmetryGroup = createNode('transform', n=names.get('symmetry', 'rnm_symmetryGroup'), p=self.fitSkeletonGroup)
 			self.freezeList.append(self.symmetryGroup)
@@ -1326,7 +1327,7 @@ class fitSkeleton:
 		self.skeleConnect(self.symmetryGroup, 'symmetryGroup')
 		# ========================================= Heirarchy Group =======================================
 		try:
-			self.fitHeirarchy = self.skeleNode.fitHeirarchy.get()
+			self.fitHeirarchy = self.skeleNode.fitHeirarchy.inputs()[0]
 		except:
 			self.fitHeirarchy = createNode('transform', n=names.get('fitHeirarchy', 'rnm_fitHeirarchyGrp'), p=self.fitGroup)
 			self.freezeList.append(self.fitHeirarchy)
@@ -1338,7 +1339,7 @@ class fitSkeleton:
 
 		# ========================================= Fit Rigs Group =======================================
 		try:
-			self.fitRigsGroup = self.skeleNode.fitRigsGroup.get()
+			self.fitRigsGroup = self.skeleNode.fitRigsGroup.inputs()[0]
 		except:
 			self.fitRigsGroup = createNode('transform', n=names.get('fitRigs', 'rnm_fitRigs'), p=self.fitGroup)
 			self.freezeList.append(self.fitRigsGroup)
@@ -1346,7 +1347,7 @@ class fitSkeleton:
 		self.skeleConnect(self.fitRigsGroup, 'fitRigsGroup')
 		# ========================================= Rig Group ==========================================
 		try:
-			self.rigGroup = self.skeleNode.rigGroup.get()
+			self.rigGroup = self.skeleNode.rigGroup.inputs()[0]
 		except:
 			self.rigGroup = createNode('transform', n=names.get('rig', 'rnm_rig'), p=self.lastOffset)
 			self.freezeList.append(self.rigGroup)
@@ -1362,7 +1363,7 @@ class fitSkeleton:
 		# self.skeleConnect(self.socketGroup, 'socketGroup')
 		# # ========================================= Output Group ==========================================
 		try:
-			self.outputGroup = self.skeleNode.outputGroup.get()
+			self.outputGroup = self.skeleNode.outputGroup.inputs()[0]
 		except:
 			self.outputGroup = createNode('transform', n=names.get('output', 'rnm_outputGroup'), p=self.rigGroup)
 			self.freezeList.append(self.outputGroup)
@@ -1373,7 +1374,7 @@ class fitSkeleton:
 		Not sure if this should really be locked. add ability to offset the geo from rig controls?
 		'''
 		try:
-			self.geometryGroup = self.skeleNode.geometryGroup.get()
+			self.geometryGroup = self.skeleNode.geometryGroup.inputs()[0]
 		except:
 			self.geometryGroup = createNode('transform', n=names.get('geometry', 'rnm_geometry'), p=self.lastOffset)
 			self.geometryGroup.inheritsTransform.set(0)
@@ -1390,7 +1391,7 @@ class fitSkeleton:
 		print 'Fit Rig Initialization Completed.\n'
 
 	def skeleConnect(self, node, attribute, multi=False):
-		
+		print node
 		if not hasAttr(node, 'skeleNode'):
 			addAttr(node, ln='skeleNode', at='message', h=self.hidden)
 		if not hasAttr(self.skeleNode, attribute):
@@ -2419,11 +2420,13 @@ class fitRig:
 			# rigNode = buildRig_threePointIK.rigBuildThreePointIK(fitNode)
 		
 		elif fitNode.rigType.get() == 'chain':
-			import chain
-			if self.dev: reload(chain)
 			if fitNode.rigStyle.get(asString=True) == 'fk':
+				import chain
+				if self.dev: reload(chain)
 				rigNode = chain.chain(fitNode).rigNode
 			else:
+				import bezierChain
+				if self.dev: reload(bezierChain)
 				rigNode = bezierChain.bezierChain(fitNode).rigNode
 			
 		elif fitNode.rigType.get() == 'footRoll':

@@ -1,3 +1,5 @@
+from pymel.core import *
+import utils
 import buildRig
 class aimIK(buildRig.rig):
 
@@ -30,7 +32,7 @@ class aimIK(buildRig.rig):
 
 			self.crvs = []
 
-			rig.__init__(self, fitNode)
+			buildRig.rig.__init__(self, fitNode)
 
 			jointsList = fitNode.jointsList.get()
 			orientControlsList = [fitNode.startOriCtrl.get(), fitNode.endOriCtrl.get()]
@@ -164,7 +166,7 @@ class aimIK(buildRig.rig):
 						print '%s' % self.rigsGroup
 						print '%s' % fkCtrl.buf.get()
 					fkCtrl.message.connect(self.rigNode.fkCtrl)
-					fkOriCtrlSS = spaceSwitch(
+					fkOriCtrlSS = buildRig.spaceSwitch(
 						constraintType='orient',
 						controller = fkCtrl,
 						constrained= fkCtrl.const.get(),
@@ -204,7 +206,7 @@ class aimIK(buildRig.rig):
 			aimIKGroup.results.get()[1].message.connect(self.rigNode.socketList, na=1)
 
 			# if doIkStartCtrl:
-			# 	startOriCtrlSS = spaceSwitch(
+			# 	startOriCtrlSS = buildRig.spaceSwitch(
 			# 		constraintType='orient',
 			# 		controller = self.aimCtrls[0],
 			# 		constrained= self.aimCtrls[0].const.get(),
@@ -217,7 +219,7 @@ class aimIK(buildRig.rig):
 			# 	startOriCtrlSS.setDefaultBlend(1)
 
 			if doIkEndCtrl:
-				endOriCtrlSS = spaceSwitch(
+				endOriCtrlSS = buildRig.spaceSwitch(
 					constraintType='orient',
 					controller = self.aimCtrls[1],
 					constrained= self.aimCtrls[1].const.get(),
