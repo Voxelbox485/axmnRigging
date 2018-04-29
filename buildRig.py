@@ -175,19 +175,8 @@ class rig:
 
 		self.dev = dev
 		
-		waitCursor( state=True )
-
-		if self.dev:
-			if self.collectStrayNodes:
-				self.worldNodesBoolStart = ls()
+		self.initializeEnvironment()
 		
-		self.lockNodeEditor()
-
-		if self.useProgressBar:
-			if self.gMainProgressBar.getIsMainProgressBar():
-				self.gMainProgressBar.setIsInterruptable()
-				self.gMainProgressBar.beginProgress()
-
 		'''Delete old rig'''
 		if hasAttr(fitNode, 'rigNode'):
 			# rigGroup = fitNode.rigNode.get() # Not searching shapes...
@@ -375,7 +364,30 @@ class rig:
 
 		if self.dev: print 'Basic rigNode complete.'
 
+	def initializeEnvironment(self):
+		# Do things to prepare scene for the onslaught
+		if self.dev: print '# initializeEnvironment'
+
+		# Prevent nodeEditor from recording every new node
+		self.lockNodeEditor()
+
+		# mouse cursor feedback
+		waitCursor( state=True )
+
+		# Progress bar data input
+		if self.useProgressBar:
+			if self.gMainProgressBar.getIsMainProgressBar():
+				self.gMainProgressBar.setIsInterruptable()
+				self.gMainProgressBar.beginProgress()
+
+		# identifies nodes existing before creation to compare with later
+		if self.dev:
+			if self.collectStrayNodes:
+				self.worldNodesBoolStart = ls()
+		
+
 	def finalize(self, skipAssetize=False):
+
 		if self.dev: print '# finalize'
 
 		if self.dev: print '\n'
@@ -1563,7 +1575,7 @@ class rig:
 
 
 	# ========================================== AIM IK ==============================================
-	def buildAimIkSetup(self, source, dest, sourceShape=None, destShape=None, controller=None, rigGroup=None, followInputs=False, inbetweenJoints=0, worldUpLocation=None, scaling=False, stretch=False, volume=False, twist=False, registerControls=[True, True], mirror=False, skipStart=False, skipEnd=False, twistAxisChoice=None):
+	def buildAimIkSetup(self, source, dest, sourceShape=None, destShape=None, controller=None, rigGroup=None, followInputs=False, inbetweenJoints=0, worldUpLocation=None, scaling=False, stretch=False, volume=False, twist=False, registerControls=[True, True], mirror=False, skipStart=False, skipEnd=False, stretchBehavior='translation', twistAxisChoice=None):
 		if self.dev: print '# buildAimIkSetup'
 		if self.dev: print '\n'
 		self.sectionTag = 'AimIK'
@@ -2794,7 +2806,7 @@ class rig:
 
 	# ============================================== BEZIER CURVE ==============================================
 
-	def buildBezierSetup(self, transforms, shapes, ctrlTransforms=None, controller=None, defaultTangents=None, follow=True, mirror=False, indic=False, bias=True, twist=True, twistAxisChoice=0, doNeutralize=True, doStrength=False, bezChain=False, closeLoop=False):
+	def buildBezierSetup(self, transforms, shapes=None, ctrlTransforms=None, controller=None, defaultTangents=None, follow=True, mirror=False, indic=False, bias=True, twist=True, twistAxisChoice=0, doNeutralize=True, doStrength=False, bezChain=False, closeLoop=False):
 		if self.dev: print '# buildBezierSetup'
 		'''
 		Mag blend should be not allow any offset except that of control
@@ -2828,8 +2840,11 @@ class rig:
 		self.step(bezierRigGroup, 'bezierRigGroup')
 		self.publishList.append(bezierRigGroup)
 		
-
 		addAttr(bezierRigGroup, ln='results', at='message', multi=True, indexMatters=False, k=1)
+
+		addAttr(bezierRigGroup, ln='ctrls', at='message', multi=True, indexMatters=False, k=1)
+
+		addAttr(bezierRigGroup, ln='curve', at='message', k=1)
 
 		addAttr(bezierRigGroup, ln='uValues', at='compound', numberOfChildren=len(transforms), k=1)
 		for i in range(len(transforms)):
@@ -2847,6 +2862,8 @@ class rig:
 			addAttr(controller, ln='controlsVis', at='short', min=0, max=1, dv=1)
 			controller.controlsVis.set(k=0, cb=1)
 		
+
+
 		if doNeutralize:
 			if not hasAttr(controller, 'neutralizeAll'):
 				addAttr(controller, ln='neutralizeAll', min=0, max=1, dv=0, k=1)
@@ -2929,11 +2946,10 @@ class rig:
 				if len(shapes[i].getShapes()):
 					outlinerColor = shapes[i].getShapes()[0].overrideColorRGB.get()
 			
-
 			ctrl = self.createControlHeirarchy(
 				transformSnap=ctrlTrans if ctrlTrans else trans,
 				name=self.names.get('bendCtrl', 'rnm_bendCtrl'),
-				shape=shapes[i],
+				shape=(None if not shapes else shapes[i]),
 				outlinerColor=outlinerColor,
 				par=bendControlGroup,
 				ctrlParent=bezierRigGroup,
@@ -2941,14 +2957,24 @@ class rig:
 				mirror=(mirror[i] if isinstance(mirror, list) else mirror),
 				mirrorStart=(mirror[i] if isinstance(mirror, list) else mirror)
 				)
-			ctrls.append(ctrl)
+			ctrl.message.connect(bezierRigGroup.ctrls, na=True)
+
+
 			if i==0:
 				if mirror and bezChain:
 					if hasAttr(ctrl, 'mirror'):
 						ctrl.mirror.get().r.set(0,0,0)
-						ctrl.mirror.get().s.set(1,1,-1)
-			# col.setViewportRGB(ctrl, (0.5,0.5,0.5))
+						ctrl.mirror.get().s.set(1,1,1)
+
+
 			controller.controlsVis.connect(ctrl.buf.get().v)
+
+			
+			ctrls.append(ctrl)
+
+
+
+			# col.setViewportRGB(ctrl, (0.5,0.5,0.5))
 
 			try:
 				self.bendCtrls.append(ctrl)
@@ -2958,21 +2984,27 @@ class rig:
 
 
 			# Attributes
-			utils.cbSep(ctrl)
-			addAttr(ctrl, ln='magnitude', softMinValue=0, softMaxValue=3, dv=1, k=1)
-			ctrl.magnitude.set(1)
+			if not hasAttr(ctrl, 'magnitude'):
+				utils.cbSep(ctrl)
+				addAttr(ctrl, ln='magnitude', softMinValue=0, softMaxValue=3, dv=1, k=1)
+				ctrl.magnitude.set(1)
 
 			if doNeutralize:
-				addAttr(ctrl, ln='neutralize', min=0, max=1, dv=1, k=1)
+
+				if not hasAttr(ctrl, 'neutralize'):
+					addAttr(ctrl, ln='neutralize', min=0, max=1, dv=1, k=1)
 			if doStrength:
-				addAttr(ctrl, ln='strength', min=0, max=1, dv=0, k=1)
+				if not hasAttr(ctrl, 'strength'):
+					addAttr(ctrl, ln='strength', min=0, max=1, dv=0, k=1)
 			
 			if bias:
-				addAttr(ctrl, ln='orientBias', min=-10, max=10, dv=10, k=1)
-			utils.cbSep(ctrl)
+				if not hasAttr(ctrl, 'orientBias'):
+					addAttr(ctrl, ln='orientBias', min=-10, max=10, dv=10, k=1)
+					utils.cbSep(ctrl)
 			# Joints for main, selection handles for tangents
 			if twist:
-				addAttr(ctrl, ln='twist', k=1)
+				if not hasAttr(ctrl, 'twist'):
+					addAttr(ctrl, ln='twist', k=1)
 
 
 			# locator (to measure world position for distance)
@@ -3005,7 +3037,7 @@ class rig:
 
 			# Either have bend controls follow input transforms, or just be placed at their position
 			if follow:
-				self.matrixConstraint(trans, ctrl.const.get(), t=1, s=1, offset=1)
+				self.matrixConstraint(trans, ctrl.const.get(), t=1, r=0 if bias else 1, s=1, offset=1)
 
 				# ============================= Orient Bias ============================= 
 				if bias:
@@ -3079,11 +3111,12 @@ class rig:
 			for tang in [tangentControl0, tangentControl1]:
 
 				if not tang is None:
-					viewColor = shapes[i].getShapes()[0].overrideColorRGB.get()
-					col.setViewportRGB(tang, viewColor)
+					if shapes:
+						viewColor = shapes[i].getShapes()[0].overrideColorRGB.get()
+						col.setViewportRGB(tang, viewColor)
 
 					# Mirror tangent axis buf
-					if mirror: tang.buf.get().s.getChildren()[twistAxisChoice].set(-1)
+					# if mirror: tang.buf.get().s.getChildren()[twistAxisChoice].set(-1)
 
 					# Vis
 					# self.rigNode.tangentCtrlsVis.connect(tang.buf.get().v)
@@ -3330,7 +3363,7 @@ class rig:
 					tangentDefault = self.createControlHeirarchy(
 						name='%s_out' % self.names.get('tangentDefault', 'rnm_tangentDefault'),
 						par=tang.extra.get().getParent(),
-						ctrlParent=tang, 
+						ctrlParent=ctrl, 
 						selectionPriority=2,
 						jntBuf=True,
 						outlinerColor=outlinerColor, 
@@ -3347,6 +3380,7 @@ class rig:
 					# addAttr(tang.extra.get(), ln='defaultY', at='float', p='default', k=1)
 					# addAttr(tang.extra.get(), ln='defaultZ', at='float', p='default', k=1)
 
+					# add const, control, and extra to create result postion
 					tangentDefault.extra.get().t.set(tang.extra.get().translate.get())
 					tangentDefaultAdd = createNode('plusMinusAverage', n=self.names.get('tangentDefaultAdd', 'rnm_tangentDefaultAdd'))
 					self.step(tangentDefaultAdd, 'tangentDefaultAdd')
@@ -3487,6 +3521,7 @@ class rig:
 		crvS.rename('%sShape' % crv.nodeName())
 		addAttr(crv, ln='offsetCurve', at='message')
 		self.debugVis.connect(crv.v)
+		crv.message.connect(bezierRigGroup.curve)
 		# crv.hide()
 
 		# Make clusters and parent
@@ -3628,6 +3663,8 @@ class rig:
 		self.step(bendRigGroup, 'bendRigGroup')
 		self.publishList.append(bendRigGroup)
 		
+
+		addAttr(bendRigGroup, ln='curve', at='message', k=1)
 
 		addAttr(bendRigGroup, ln='uValues', at='compound', numberOfChildren=len(transforms), k=1)
 		
@@ -3801,6 +3838,7 @@ class rig:
 		crvS.rename('%sShape' % crv.nodeName())
 		addAttr(crv, ln='offsetCurve', at='message')
 		self.debugVis.connect(crv.v)
+		crv.message.connect(bendRigGroup.curve)
 			# crv.hide()
 
 		# Attach world transforms directly to curve
@@ -4258,7 +4296,7 @@ class rig:
 		
 
 	# ============================================== PARAMETRIC CURVE PARTITION ==============================================
-	def buildCurvePartitionsSetup(self, crv, partitionParams=None, paramLists=None, constraintTargets=None, nameVars=None, numJointsList=None, mirror=False, stretch=True, upAxisSwitch=True, scale=False, twist=True, rotationStyle='aim', bindEnd=True, createOffsetControls=True):
+	def buildCurvePartitionsSetup(self, crv, partitionParams=None, paramLists=None, constraintTargets=None, nameVars=None, numJointsList=None, mirror=False, stretch=True, upAxisSwitch=True, scalingControls=None, twist=True, rotationStyle='aim', bindEnd=True, createOffsetControls=True):
 		if self.dev: print '\nbuildCurvePartitionsSetup'
 
 		# Error check
@@ -4398,9 +4436,6 @@ class rig:
 			if twist:
 				addAttr(parametricCurveRigGroup, ln='twistInput%sStart' % n, nn='Twist Input %s Start' % n, dv=0, parent='twistInputs', k=1)
 				addAttr(parametricCurveRigGroup, ln='twistInput%sEnd' % n, nn='Twist Input %s End' % n, dv=0, parent='twistInputs', k=1)
-			if scale:
-				addAttr(parametricCurveRigGroup, ln='scaleInput%sStart' % n, nn='Scale Input %s Start' % n, dv=0, parent='scaleInputs', k=1)
-				addAttr(parametricCurveRigGroup, ln='scaleInput%sEnd' % n, nn='Scale Input %s End' % n, dv=0, parent='scaleInputs', k=1)
 
 
 		upAxisSwitch = createNode('condition', n=self.names.get('upAxisSwitch', 'rnm_upAxisSwitch'))
@@ -4465,7 +4500,6 @@ class rig:
 			# for param in paramLists[i]:
 			# 	print param
 			
-
 
 			# Per joint
 			for j, param in enumerate(paramLists[i]):
@@ -4582,14 +4616,16 @@ class rig:
 				# # translate
 				# ctrl.buf.get().t.set(decmpMtrx.outputTranslate.get())
 				decmpMtrx.outputTranslate.connect(ctrl.const.get().translate)
-				if paramLists[i] is paramLists[-1]:
-					decmpMtrx.outputRotate.connect(ctrl.const.get().rotate)
+				
+				# if paramLists[i] is paramLists[-1]:
+				decmpMtrx.outputRotate.connect(ctrl.const.get().rotate)
 
 			
 				try:
 					self.curvePointOffsets.append(ctrl)
 				except AttributeError:
 					self.curvePointOffsets = [ctrl]
+
 
 				ctrl.message.connect(parametricCurveRigGroup.results, na=True)
 
@@ -6023,7 +6059,7 @@ def twistExtractorMatrix(points=None, base=None, settingsNode=None, rigNode=None
 	with UndoChunk():
 		for point in points:
 			# Names
-			prefix = point.shortName()
+			prefix = point.nodeName()
 			if buck:
 				names = {
 				'staticLoc':			'null_%s_twist_static'		% (prefix),

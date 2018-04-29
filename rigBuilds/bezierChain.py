@@ -70,7 +70,7 @@ class bezierChain(buildRig.rig):
 			if hasAttr(self.fitNode, 'doBias'):
 				doBias = bool(self.fitNode.doBias.get())
 
-			inbetweenJoints = 3
+			inbetweenJoints = 4
 			if hasAttr(self.fitNode, 'inbetweenJoints'):
 				inbetweenJoints = self.fitNode.inbetweenJoints.get()
 
@@ -242,7 +242,7 @@ class bezierChain(buildRig.rig):
 				bezierRigGroup = self.buildBezierSetup(
 					transforms=transforms,
 					ctrlTransforms=transforms,
-					shapes=ikShapes,
+					shapes=fkShapes,
 					follow=True if doFK or doOffsets else False,
 					twist=autoTwist,
 					bias=doBias,
@@ -278,8 +278,12 @@ class bezierChain(buildRig.rig):
 					rotationStyle=rotationStyle,
 					twist=True
 				)
+
 				results = crvPathRig.results.get()
 				self.offsetsVis.connect(crvPathRig.v)
+
+
+
 
 				for i in range(len(self.bendCtrls)):
 					# addAttr(crvPathRig, ln='partitionParameters', multi=True, numberOfChildren=3, k=1)
@@ -324,7 +328,14 @@ class bezierChain(buildRig.rig):
 						if not rangeEnd:
 							(twistSettingsList[i].twist.connect(			self.twistAdds[i].input2D[2].getChildren()[0]	))
 
-				# scaleLengthGroup = self.buildScaleLengthSetup(scaleInputs=self.bendCtrls, nodes=results, settingsNode=self.rigNode)
+				# if scaling:
+				nodes0 = crvPathRig.results.get()[:len(crvPathRig.results.get())/2]
+				nodes1 = crvPathRig.results.get()[len(crvPathRig.results.get())/2:]
+				scaleLengthGroup0 = self.buildScaleLengthSetup(scaleInputs=bezierRigGroup.ctrls.get()[:2], nodes=nodes0, settingsNode=self.rigNode)
+				scaleLengthGroup1 = self.buildScaleLengthSetup(scaleInputs=bezierRigGroup.ctrls.get()[1:], nodes=nodes1, settingsNode=self.rigNode)
+				print scaleLengthGroup0
+				print scaleLengthGroup1
+				results = scaleLengthGroup0 + scaleLengthGroup1
 
 				for i, res in enumerate(results):
 

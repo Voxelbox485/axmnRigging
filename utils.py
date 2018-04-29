@@ -32,6 +32,55 @@ sources()
 stripNum()
 
 '''
+from pymel.core import *
+def resetSkinClusters( skinClusters ):
+	''' Updates current pose to bindpose '''
+
+	# operate on list if that's the input
+	if not isinstance(skinClusters, list):
+		skinClusters = [skinClusters]
+
+	for sc in skinClusters:
+		# If string input, get Pynode
+		if isinstance(sc, str) or isinstance(sc, unicode):
+			try:
+				sc = ls(sc)[0]
+			except IndexError:
+				try:
+					raise Exception('SkinCluster not found in scene: %s' % sc)
+				except: # no assumptions
+					raise Exception('SkinCluster not found in scene.')
+
+
+		# Get influences
+		infs = sc.matrix.inputs()
+		lenInfs = len(infs)
+		# To make sure every joint gets updated (whether or not there are missing index values in skinCluster), use length of influences to drive loop
+		n=0 # Matrix attribute index
+		i=0 # Len Influence index
+		while True: # use 'break' to drive loop
+			# retrieve input under index value. if none found, assume it was empty and make sure not to skip it
+			try:
+				slotNJoint = sc.matrix[n].inputs()[0]
+			except IndexError:
+				n=n+1
+				if n == 9999: # Shouldnt fail, but failure causes crash
+					raise Exception('Interable overflow')
+				else:
+					continue
+
+			# Set bindPreMatrix to current inverse matrix point
+			sc.bindPreMatrix[n].set(slotNJoint.worldInverseMatrix.get())
+
+			for dPose in listConnections(sc, d=False, type='dagPose' ) or []:
+				dagPose( slotNJoint, reset=True, n=dPose )
+
+			n=n+1
+			i=i+1
+			# break when all inputs are accounted for
+			if i >= lenInfs:
+				break
+
 def selectCBInputs(selection=None):
 	newSelList = []
 	with UndoChunk():

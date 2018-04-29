@@ -1184,7 +1184,7 @@ class axmn_batch:
 
 
 
-	def constrainLists(self, t=True, r=True, s=True, force=False):
+	def constrainLists(self, t=False, r=True, s=True, force=False):
 		if self.dev: print '\nConstrain Lists'
 		# For each connection, do a matrixConstraint based on inputs.
 		# t = translate

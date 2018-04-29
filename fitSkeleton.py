@@ -2164,8 +2164,7 @@ class fitSkeleton:
 			for fitNode in fitRigs:
 				build=True
 				if hasAttr(fitNode, 'build'):
-					if not fitNode.build.get():
-						build=False
+					build = fitNode.build.get()
 				
 				if build:
 					if self.dev: print fitNode
@@ -2227,11 +2226,12 @@ class fitSkeleton:
 			if len(sets('rigNodeSet', q=1)):
 				for rigNode in sets('rigNodeSet', q=1):
 					if isinstance(rigNode, nt.Locator):
-						rigGroup = rigNode.rigGroup.get()
-						try:
-							rb.removeMatrixConstraint(rigGroup)
-						except:
-							warning('Remove Matrix Constraint failed on rigGroup: %s' % rigGroup)
+						if rigNode.fitNode.get():
+							rigGroup = rigNode.rigGroup.get()
+							try:
+								rb.removeMatrixConstraint(rigGroup)
+							except:
+								warning('Remove Matrix Constraint failed on rigGroup: %s' % rigGroup)
 
 
 	def rigHeirarchy(self):
@@ -2428,6 +2428,11 @@ class fitRig:
 				import bezierChain
 				if self.dev: reload(bezierChain)
 				rigNode = bezierChain.bezierChain(fitNode).rigNode
+
+		elif fitNode.rigType.get() == 'lips':
+			import lips
+			if self.dev: reload(lips)
+			rigNode = lips.lips(fitNode).rigNode
 			
 		elif fitNode.rigType.get() == 'footRoll':
 			pass
@@ -2847,7 +2852,7 @@ class fkHeirarchy(fitRig):
 		addAttr(fitNode, ln='rigStyle', at='enum', ct='input', enumName='fk:bezier', keyable=True)
 
 		addAttr(fitNode, ln='offsets', ct='input', at='short', k=1, min=0, max=1, dv=0)
-		addAttr(fitNode, ln='multiChain', ct='input', at='short', k=1, min=0, max=1, dv=0)
+		addAttr(fitNode, ln='hierarchy', ct='input', at='short', k=1, min=0, max=1, dv=0)
 
 		addAttr(fitNode, ln='fkShapes', ct='shape', at='message', multi=1, indexMatters=0, keyable=True, h=self.hidden)
 		addAttr(fitNode, ln='ikShapes', ct='shape', at='message', multi=1, indexMatters=0, keyable=True, h=self.hidden)
@@ -2893,16 +2898,16 @@ class lipsFitRig(fitRig):
 			print self.fitNode
 
 		# FITNODE SPECIFIC ATTRIBUTES
-		self.fitNode = self.chainInit(self.fitNode, mirrorFitRig=mirrorFitRig)
+		self.fitNode = self.lipsInit(self.fitNode, mirrorFitRig=mirrorFitRig)
 
 		# MIRRORING
 		# Automatically mirror if all mirror joints found (and mirroring hasn't already been done)
-		if not mirrorFitRig and all(self.hasMirror(j) for j in joints):
-			if self.dev: print 'Apply Mirroring'
-			mirrorFitNode = self.mirrorFitRig(self.fitNode)
+		# if not mirrorFitRig and all(self.hasMirror(j) for j in joints):
+		# 	if self.dev: print 'Apply Mirroring'
+		# 	mirrorFitNode = self.mirrorFitRig(self.fitNode)
 
 
-	def chainInit(self, fitNode, mirrorFitRig=False):
+	def lipsInit(self, fitNode, mirrorFitRig=False):
 		'''Takes three points and converts them into fkIk rig
 		To Do:
 		Debug mode
@@ -2915,7 +2920,7 @@ class lipsFitRig(fitRig):
 		#===================================================================================================
 		#===================================================================================================
 		# Start data
-		jnts = fitNode.jointsList.get()
+		jointsList = fitNode.jointsList.get()
 		settings = self.fitGroup
 		fitRigsGrp = self.fitRigsGrp
 
@@ -2924,12 +2929,11 @@ class lipsFitRig(fitRig):
 		subNames = fitNode.subName0.get()
 		rigType = fitNode.rigType.get()
 		suffix = ''
-		side = fitNode.side.get()
-		
+
 		# ========================================= Names ==========================================
 		names = {
-		'fitNode':					'%s_fitNode%s'						% (jnts[0], rigType),
-		'grp':						'%s_%s'								% (jnts[0], rigType),
+		'fitNode':					'%s_fitNode%s'						% (jointsList[0], rigType),
+		'grp':						'%s_%s'								% (jointsList[0], rigType),
 		'vec':						'%s_upVector%s' 					% (rigType, suffix),
 		'controlScaleMult':			'%s_ctrlScale_MULT%s' 				% (rigType, suffix),
 		'adjustMult':				'%s_adjust_MULT%s' 					% (rigType, suffix),
@@ -2950,86 +2954,95 @@ class lipsFitRig(fitRig):
 		# Rig-specific attributes
 		rb.cbSep(fitNode)
 		
-		addAttr(fitNode, ln='rigStyle', at='enum', ct='input', enumName='fk:bezier', keyable=True)
+		# addAttr(fitNode, ln='rigStyle', at='enum', ct='input', enumName='bezier:midPoint', keyable=True)
 
-		addAttr(fitNode, ln='offsets', ct='input', at='short', k=1, min=0, max=1, dv=0)
-		addAttr(fitNode, ln='multiChain', ct='input', at='short', k=1, min=0, max=1, dv=0)
+		addAttr(fitNode, ln='shapes', ct='shape', at='message', multi=1, indexMatters=0, keyable=True, h=self.hidden)
+		# addAttr(fitNode, ln='ikShapes', ct='shape', at='message', multi=1, indexMatters=0, keyable=True, h=self.hidden)
 
-		addAttr(fitNode, ln='fkShapes', ct='shape', at='message', multi=1, indexMatters=0, keyable=True, h=self.hidden)
-		addAttr(fitNode, ln='ikShapes', ct='shape', at='message', multi=1, indexMatters=0, keyable=True, h=self.hidden)
+		addAttr(fitNode, ln='inbetweenJoints', ct='input', min=0, dv=2, k=1)
 		
-		
-
-		jnt0T = xform(jnts[0], q=1, rp=1, ws=1)
-		jnt0R = xform(jnts[0], q=1, ro=1, ws=1)
-
 		# MAIN GROUPS
 		# Group
 		grp = createNode('transform', n=names.get('grp', 'rnm_grp'), p=fitRigsGrp)
 		nodeList.append(grp)
 		freezeList.append(grp)
 		if self.dev: print grp
-		move(grp, jnt0T, rpr=1, ws=1)
-		xform(grp, ro=jnt0R, ws=1)
+		rb.snap(jointsList[0], grp)
 		self.fitNode.v.connect(grp.v)
 		rb.messageConnect([grp], 'message', fitNode, 'fitGroup')
 		# parent(fitNode, grp, r=True, s=True)
+		
 
+		shapesGrp = createNode('transform', n='%s_%s' % (jointsList[0], names.get('shapesGrp', 'rnm_shapesGrp')), p=grp)
+		nodeList.append(shapesGrp)
+		fitNode.controlScaleResult >> shapesGrp.scaleX
+		fitNode.controlScaleResult >> shapesGrp.scaleY
+		fitNode.controlScaleResult >> shapesGrp.scaleZ
+		rb.snap(jointsList[0], shapesGrp)
+		freezeList.append(shapesGrp)
+		parentConstraint(jointsList[0], shapesGrp)
+		fitNode.shapesVis >> shapesGrp.v
+		if self.dev:
+			print shapesGrp
 
+		# FK start node
+		fkGrp = createNode('transform', n='%s_%s' % (jointsList[0].shortName(), names.get('fkGrp', 'rnm_fkGrp')), p=shapesGrp)
+		nodeList.append(fkGrp)
+		fkNode = ls(rb.shapeMaker(name='%s_%s' % (jointsList[0].shortName(), names.get('fkShape', 'rnm_fkShape')), shape=2))[0]
+		# fitNode.shapesVis >> fkNode.v
+		parent(fkNode, fkGrp)
+		fkNode.translate.set([0,0,0])
+		fkNode.rotate.set([0,0,90])
+		fkNode.scale.set([1,1,1])
+		makeIdentity(fkNode, apply=1, t=1, r=1, s=1, n=0, pn=1)
+		fkShape = fkNode.getShapes()[0]
+		fkNode.message.connect(fitNode.shapes, na=1)
+		col.setViewportRGB([fkShape], self.colorsFK[0])
+		nodeList.append(fkNode)
+		shapesList.append(fkNode)
 
+		if self.dev:
+			print fkGrp
 
-		for i, jnt in enumerate(jnts):
-			# name objects
-			if len(jnts) < 10:
-				d = i
-			elif len(jnts) < 100:
-				d = '%01d' % i
-			else:
-				d = '%02d' % i
+		for i, jnt in enumerate(jointsList[1:]):
 
-			if self.dev:
-				print "\n"
-				print d
-
-			# Get input transform space
-			jntT = xform(jnt, q=1, rp=1, ws=1)
-			jntR = xform(jnt, q=1, ro=1, ws=1)
 			# Shapes
 			shapesGrp = createNode('transform', n='%s_%s' %(jnt, names.get('shapesGrp', 'rnm_shapesGrp')), p=grp)
 			nodeList.append(shapesGrp)
 			fitNode.controlScaleResult >> shapesGrp.scaleX
 			fitNode.controlScaleResult >> shapesGrp.scaleY
 			fitNode.controlScaleResult >> shapesGrp.scaleZ
-			move(shapesGrp, jntT, rpr=1, ws=1)
-			xform(shapesGrp, ro=jntR, ws=1)
+			rb.snap(jnt, shapesGrp)
 			freezeList.append(shapesGrp)
 			parentConstraint(jnt, shapesGrp)
 			fitNode.shapesVis >> shapesGrp.v
 			if self.dev:
 				print shapesGrp
+
+
 			# VectorY (?)
-			vecProd = createNode('vectorProduct', n='%s_%s' %(jnt, names.get('vec', 'rnm_vector')))
-			vecSetAttr = {'input1': [0, 1, 0], 'operation': 3}
-			rb.setAttrsWithDictionary(vecProd, vecSetAttr)
-			connectAttr(jnt.worldMatrix[0], vecProd.matrix)
-			if not hasAttr(fitNode, 'upVector%s' % d):
-				addAttr(fitNode, ln='upVector%s' % d, at='compound', numberOfChildren=3, keyable=0)
-				addAttr(fitNode, ln='upVector%sX' % d, at='float', parent='upVector%s' % d, keyable=0)
-				addAttr(fitNode, ln='upVector%sY' % d, at='float', parent='upVector%s' % d, keyable=0)
-				addAttr(fitNode, ln='upVector%sZ' % d, at='float', parent='upVector%s' % d, keyable=0)
-			connectAttr(vecProd.outputX, fitNode.attr('upVector%sX' % d))
-			connectAttr(vecProd.outputY, fitNode.attr('upVector%sY' % d))
-			connectAttr(vecProd.outputZ, fitNode.attr('upVector%sZ' % d))
-			nodeList.append(vecProd)
-			if self.dev:
-				print vecProd
+			# vecProd = createNode('vectorProduct', n='%s_%s' %(jnt, names.get('vec', 'rnm_vector')))
+			# vecSetAttr = {'input1': [0, 1, 0], 'operation': 3}
+			# rb.setAttrsWithDictionary(vecProd, vecSetAttr)
+			# connectAttr(jnt.worldMatrix[0], vecProd.matrix)
+			# if not hasAttr(fitNode, 'upVector%s' % d):
+			# 	addAttr(fitNode, ln='upVector%s' % d, at='compound', numberOfChildren=3, keyable=0)
+			# 	addAttr(fitNode, ln='upVector%sX' % d, at='float', parent='upVector%s' % d, keyable=0)
+			# 	addAttr(fitNode, ln='upVector%sY' % d, at='float', parent='upVector%s' % d, keyable=0)
+			# 	addAttr(fitNode, ln='upVector%sZ' % d, at='float', parent='upVector%s' % d, keyable=0)
+			# connectAttr(vecProd.outputX, fitNode.attr('upVector%sX' % d))
+			# connectAttr(vecProd.outputY, fitNode.attr('upVector%sY' % d))
+			# connectAttr(vecProd.outputZ, fitNode.attr('upVector%sZ' % d))
+			# nodeList.append(vecProd)
+			# if self.dev:
+			# 	print vecProd
 
 
-			if mirrorFitRig:
-				unitConvert = createNode('unitConversion')
-				unitConvert.conversionFactor.set(-1)
-				fitNode.controlScaleResult >> unitConvert.input
-				unitConvert.output >> shapesGrp.scaleX
+			# if mirrorFitRig:
+			# 	unitConvert = createNode('unitConversion')
+			# 	unitConvert.conversionFactor.set(-1)
+			# 	fitNode.controlScaleResult >> unitConvert.input
+			# 	unitConvert.output >> shapesGrp.scaleX
 				
 			# CONTROL SCALING
 			controlScaleMult = createNode('multDoubleLinear', n='%s_%s' % (jnt.shortName(), names.get('controlScaleMult', 'rnm_controlScaleMult'))) # Local * Global Scale
@@ -3047,36 +3060,27 @@ class lipsFitRig(fitRig):
 
 			adjustMult.o >> fitNode.controlScaleResult
 
+			mirrorFitRig = True if jnt.side.get() is 2 else False
+			if mirrorFitRig:
+				unitConvert = createNode('unitConversion')
+				unitConvert.conversionFactor.set(-1)
+				fitNode.controlScaleResult >> unitConvert.input
+				unitConvert.output >> shapesGrp.scaleX
+				
 
-			fkGrp = createNode('transform', n='%s_%s' % (jnt.shortName(), names.get('fkGrp', 'rnm_fkGrp')), p=shapesGrp)
-			nodeList.append(fkGrp)
-			fkNode = ls(rb.shapeMaker(name='%s_%s' % (jnt.shortName(), names.get('fkShape', 'rnm_fkShape')), shape=2))[0]
-			# fitNode.shapesVis >> fkNode.v
-			parent(fkNode, fkGrp)
-			fkNode.translate.set([0,0,0])
-			fkNode.rotate.set([0,0,90])
-			fkNode.scale.set([8,8,8])
-			makeIdentity(fkNode, apply=1, t=1, r=1, s=1, n=0, pn=1)
-			fkShape = fkNode.getShapes()[0]
-			fkNode.message.connect(fitNode.fkShapes, na=1)
-			col.setViewportRGB([fkShape], self.colorsFK[side])
-			nodeList.append(fkNode)
-			shapesList.append(fkNode)
-			if self.dev:
-				print fkGrp
 
 			ikGrp = createNode('transform', n='%s_%s' % (jnt.shortName(), names.get('ikGrp', 'rnm_ikGrp')), p=shapesGrp)
 			nodeList.append(ikGrp)
-			fitNode.offsets >> ikGrp.v
-			ikNode = ls(rb.shapeMaker(name='%s_%s' % (jnt.shortName(), names.get('ikShape', 'rnm_ikShape')), shape=1))[0]
+			ikNode = ls(rb.shapeMaker(name='%s_%s' % (jnt.shortName(), names.get('ikShape', 'rnm_ikShape')), shape=4))[0]
 			# fitNode.shapesVis >> ikNode.v
 			parent(ikNode, ikGrp)
 			ikNode.translate.set([0,0,0])
 			ikNode.rotate.set([0,0,90])
-			ikNode.scale.set([10,10,10])
-			ikNode.message.connect(fitNode.ikShapes, na=1)
+			ikNode.scale.set([0.1,0.1,0.1])
+			ikNode.message.connect(fitNode.shapes, na=1)
 			makeIdentity(ikNode, apply=1, t=1, r=1, s=1, n=0, pn=1)
 			ikShape = ikNode.getShapes()[0]
+			side = jnt.side.get()
 			col.setViewportRGB([ikShape], self.colorsIK[side])
 			nodeList.append(ikNode)
 			shapesList.append(ikNode)
@@ -3086,7 +3090,7 @@ class lipsFitRig(fitRig):
 		# Finalize
 		for ctrl in ctrlList:
 			# parent(fitNode, ctrl, s=1, add=1)
-			rb.ctrlSetupStandard(ctrl, ctrlSet=None, pivot=False, ro=False, )
+			rb.ctrlSetupStandard(ctrl, ctrlSet=None, pivot=False, ro=False )
 
 
 		for node in nodeList:
@@ -3095,75 +3099,6 @@ class lipsFitRig(fitRig):
 			# node.fitNode.connect(fitNode.deleteList, nextAvailable=1, f=1)
 
 		return fitNode
-
-	#===================================================================================================
-	#===================================================================================================
-
-	def mirrorFitRig(self, fitNode):
-		'''
-		Digs through and finds mirror joints to each join in provided fitrig, and uses those joints to create a new one.
-		Connects result attributes
-		'''
-		attributes = [
-		'controlScale',
-		'parentSocketIndex',
-		'offsets',
-		'globalName',
-		'visCategory',
-		'inheritScale',
-		]
-
-		i=0
-		while hasAttr(fitNode, 'subName%s' % i):
-			attributes.append('subName%s' % i)
-			i = i + 1
-
-		# fitRig.mirrorFitRig()
-		
-
-		# Get joints 
-		joints = fitNode.jointsList.get()
-		if self.dev:
-			print 'Joints:'
-			print joints
-
-		# Error check
-		if not all(self.hasMirror(j) for j in joints):
-			print 'Failed Joints: '
-			print failList
-			raise Exception('Not all joints associated with fitNode have mirrored joints connected.')
-			# Add options for specifying joints to be mirrored?
-
-		# Get mirror joints
-		mirrorJoints = []
-		for j in joints:
-			mirrorJoints.append(j.mirror.get())
-
-		if self.dev: 
-			print 'Mirrored Joints:'
-			print mirrorJoints
-
-		# Create mirrored fitRig class instance (or maintain standard class instance? easy link wouldnt be so bad?)
-		mirrorFitRig = chainFitRig(mirrorJoints, self.fitSkeleton, mirrorFitRig=True)
-
-		# Get fitNode
-		mirrorFitNode = mirrorFitRig.fitNode
-
-		# connect attributes in this list and hide right side
-		for attribute in attributes:
-			fitNode.attr(attribute).connect(mirrorFitNode.attr(attribute), force=1)
-			# mirrorFitNode.attr(attribute).set(k=0, cb=0)
-
-
-		if not hasAttr(fitNode, 'mirror'):
-			addAttr(fitNode, ln='mirror', at='message', k=1)
-		if not hasAttr(mirrorFitNode, 'mirror'):
-			addAttr(mirrorFitNode, ln='mirror', at='message', k=1)
-		mirrorFitNode.mirror.connect(fitNode.mirror)
-
-
-		if self.dev: print 'Mirror Fit Node: %s' % mirrorFitNode
-		return mirrorFitNode
 
 
 # =================================================================================
@@ -3250,8 +3185,9 @@ class chainFitRig(fitRig):
 		addAttr(fitNode, ln='rigStyle', at='enum', ct='input', enumName='fk:bezier', keyable=True)
 
 		addAttr(fitNode, ln='offsets', ct='input', at='short', k=1, min=0, max=1, dv=0)
+		addAttr(fitNode, ln='doEntranceBind', ct='input', at='short', k=1, min=0, max=1, dv=0)
 		
-		# addAttr(fitNode, ln='multiChain', ct='input', at='short', k=1, min=0, max=1, dv=0)
+		# addAttr(fitNode, ln='hierarchy', ct='input', at='short', k=1, min=0, max=1, dv=0)
 
 		addAttr(fitNode, ln='closeLoop', ct='input', at='short', k=1, min=0, max=1, dv=0)
 

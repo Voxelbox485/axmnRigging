@@ -3,18 +3,9 @@ import utils
 import buildRig
 class lips(buildRig.rig):
 
-	def __init__(self, fitNode=None, rigNode=None):
-
-		if fitNode is None and rigNode is None:
-			raise Exception('No data specified.')
-
-		elif fitNode is None:
-			self.rigNode = rigNode
-			# Put any attributes needed for initialized rigs here
-
-		else:
-
-			jointsList = fitNode.jointsList.get()
+	def __init__(self, fitNode):
+		self.dev=  True
+		try:
 			# Initialize rigNode
 			# Error Check:
 			
@@ -22,56 +13,36 @@ class lips(buildRig.rig):
 			if isinstance(fitNode, str):
 				fitNode = ls(fitNode)[0]
 
-			if fitNode.rigType.get() != 'chain':
+			if fitNode.rigType.get() != 'lips':
 				raise Exception('Incorrect rig type: %s' % fitNode.rigType.get())
 
-			self.crvs = []
+
+			jointsList = fitNode.jointsList.get()
 
 			buildRig.rig.__init__(self, fitNode)
 
-			jointsList = fitNode.jointsList.get()
 			# Move rigGroup
 			xform(self.rigGroup, ws=1, m=xform(jointsList[0], q=1, ws=1, m=1))
 
 
 			# fitNode attributes
-			fkShapes = 		self.fitNode.fkShapes.get()
-			ikShapes = 		self.fitNode.ikShapes.get()
-
-			doBezier = False
-			if hasAttr(self.fitNode, 'doBezier'):
-				doBezier = bool(self.fitNode.doBezier.get())
-
-			doMidBend = True
-			if hasAttr(self.fitNode, 'doMidBend'):
-				doMidBend = bool(self.fitNode.doMidBend.get())
-
-			autoTwist = True
-			if hasAttr(self.fitNode, 'autoTwist'):
-				self.autoTwist = bool(self.fitNode.autoTwist.get())
 
 			inbetweenJoints = 2
 			if hasAttr(self.fitNode, 'inbetweenJoints'):
 				inbetweenJoints = self.fitNode.inbetweenJoints.get()
+			numJointsList = [int(inbetweenJoints+1), int(inbetweenJoints)]
 
-
-			numJointsList = []
-			for i in range(len(jointsList)-1):
-				if not i==0:
-					if i == len(jointsList):
-						numJointsList.append(inbetweenJoints+1)
-					else:
-						numJointsList.append(inbetweenJoints)
-
+			shapes = fitNode.shapes.get()
 
 			# Mirroring
-			if self.fitNode.side.get() == 2:
-				mirror=True
-			else:
-				mirror=False
+			mirror=False
+			# if self.fitNode.side.get() == 2:
+			# 	mirror=True
+			# else:
+			# 	mirror=False
 
-			if self.fitNode.mirror.get() is False:
-				mirror=False
+			# if self.fitNode.mirror.get() is False:
+			# 	mirror=False
 
 
 			# Per joint mirroring
@@ -85,101 +56,106 @@ class lips(buildRig.rig):
 					mirrorList.append(False)
 
 
-
+			self.crvs = []
 			# Naming
-			self.globalName = self.fitNode.globalName.get()
+			self.globalName = fitNode.globalName.get()
+			
 			self.subNames = []
+			# for node in jointsList:
+				# self.subNames.append(node.nodeName())
 			subAttrs = listAttr(self.fitNode, st='subName*')
 			for subAttr in subAttrs:
 				self.subNames.append(self.fitNode.attr(subAttr).get())
-			# print 'subnames:'
-			# print self.subNames
+			print 'subnames:'
+			print self.subNames
 
 			self.naming(0)
 			self.names = utils.constructNames(self.namesDict)
 
 
-			try:
-				# ========================= RigNode Attributes =========================
-				self.rigNode.rigType.set('lips', l=1)
+		
+			# ========================= RigNode Attributes =========================
+			self.rigNode.rigType.set('lips', l=1)
 
-				utils.cbSep(self.rigNode)
-				addAttr(self.rigNode, ct='publish', ln='bendCtrlsVis', nn='Bend Ctrl Vis', at='short', min=0, max=1, dv=1, k=1)
-				setAttr(self.rigNode.bendCtrlsVis, k=0, cb=1)
+			utils.cbSep(self.rigNode)
 
-				addAttr(self.rigNode, ct='publish', ln='tangentCtrlsVis', min=0, max=1, dv=0, at='short', k=1)
-				setAttr(self.rigNode.tangentCtrlsVis, k=0, cb=1)
+			addAttr(self.rigNode, ct='publish', ln='tangentCtrlsVis', min=0, max=1, dv=0, at='short', k=1)
+			setAttr(self.rigNode.tangentCtrlsVis, k=0, cb=1)
 
-				addAttr(self.rigNode, ct='publish', ln='offsetsCtrlsVis', min=0, max=1, dv=0, at='short', k=1)
-				setAttr(self.rigNode.offsetsCtrlsVis, k=0, cb=1)
+			addAttr(self.rigNode, ct='publish', ln='offsetsCtrlsVis', min=0, max=1, dv=0, at='short', k=1)
+			setAttr(self.rigNode.offsetsCtrlsVis, k=0, cb=1)
 
-				utils.cbSep(self.rigNode)
-				addAttr(self.rigNode, ln='upAxis', at='enum', enumName='Y=1:Z=2', dv=1, k=1)
+			utils.cbSep(self.rigNode)
+			addAttr(self.rigNode, ln='upAxis', at='enum', enumName='Y=1:Z=2', dv=1, k=1)
 
-				addAttr(self.rigNode, ln='tangentsDistanceScaling', softMinValue=0, softMaxValue=1, dv=0.5, k=1)
+			addAttr(self.rigNode, ln='tangentsDistanceScaling', softMinValue=0, softMaxValue=1, dv=0.5, k=1)
 
-				# ========================= Vis Mults =========================
-				# allVis Mults
+			# ========================= Vis Mults =========================
+			# allVis Mults
 
-				bendVisMult = createNode('multDoubleLinear', n=self.names.get('bendVisMult', 'rnm_bendVisMult'))
-				self.bendVis = bendVisMult.o
-				self.rigNode.allVis >> bendVisMult.i1
-				self.rigNode.bendCtrlsVis >> bendVisMult.i2
-				self.step(bendVisMult, 'bendVisMult')
+			debugVisMult = createNode('multDoubleLinear', n=self.names.get('debugVisMult', 'rnm_debugVisMult'))
+			self.debugVis = debugVisMult.o
+			self.rigNode.allVis >> debugVisMult.i1
+			self.rigNode.debugVis >> debugVisMult.i2
+			self.step(debugVisMult, 'debugVisMult')
 
-				debugVisMult = createNode('multDoubleLinear', n=self.names.get('debugVisMult', 'rnm_debugVisMult'))
-				self.debugVis = debugVisMult.o
-				self.rigNode.allVis >> debugVisMult.i1
-				self.rigNode.debugVis >> debugVisMult.i2
-				self.step(debugVisMult, 'debugVisMult')
+			tangentVisMult = createNode('multDoubleLinear', n=self.names.get('tangentVisMult', 'rnm_tangentVisMult'))
+			self.tangentVis = tangentVisMult.o
+			self.rigNode.allVis >> tangentVisMult.i1
+			self.rigNode.tangentCtrlsVis >> tangentVisMult.i2
+			self.step(tangentVisMult, 'tangentVisMult')
 
-				tangentVisMult = createNode('multDoubleLinear', n=self.names.get('tangentVisMult', 'rnm_tangentVisMult'))
-				self.tangentVis = tangentVisMult.o
-				self.rigNode.allVis >> tangentVisMult.i1
-				self.rigNode.tangentCtrlsVis >> tangentVisMult.i2
-				self.step(tangentVisMult, 'tangentVisMult')
+			offsetsVisMult = createNode('multDoubleLinear', n=self.names.get('offsetsVisMult', 'rnm_offsetsVisMult'))
+			self.offsetsVis = offsetsVisMult.o
+			self.rigNode.allVis >> offsetsVisMult.i1
+			self.rigNode.offsetsCtrlsVis >> offsetsVisMult.i2
+			self.step(offsetsVisMult, 'offsetsVisMult')
 
-				offsetsVisMult = createNode('multDoubleLinear', n=self.names.get('offsetsVisMult', 'rnm_offsetsVisMult'))
-				self.offsetsVis = offsetsVisMult.o
-				self.rigNode.allVis >> offsetsVisMult.i1
-				self.rigNode.offsetsCtrlsVis >> offsetsVisMult.i2
-				self.step(offsetsVisMult, 'offsetsVisMult')
+			# ========================= World Group =========================
+			worldGroup = createNode('transform', n=self.names.get('worldGroup', 'rnm_worldGroup'), p=self.rigGroup)
+			self.worldGroup = worldGroup
+			self.step(worldGroup, 'worldGroup')
+			worldGroup.inheritsTransform.set(0)
+			xform(worldGroup, rp=[0,0,0], ro=[0,0,0], ws=1)
 
-				# ========================= World Group =========================
-				worldGroup = createNode('transform', n=self.names.get('worldGroup', 'rnm_worldGroup'), p=self.rigGroup)
-				self.worldGroup = worldGroup
-				self.step(worldGroup, 'worldGroup')
-				worldGroup.inheritsTransform.set(0)
-				xform(worldGroup, rp=[0,0,0], ro=[0,0,0], ws=1)
+			
+			controlGroup = createNode('transform', n=self.names.get('controlGroup', 'rnm_controlGroup'), p=self.rigGroup)
+			self.step(controlGroup, 'controlGroup')
 
-				
-				controlGroup = createNode('transform', n=self.names.get('controlGroup', 'rnm_controlGroup'), p=self.rigGroup)
-				self.step(controlGroup, 'controlGroup')
 
-				self.lipCtrls = []
-				# For each joint, create a control
-				for i, jnt in enumerate(jointsList):
-					lipCtrl = self.createControlHeirarchy(
-						transformSnap = jnt,
-						selectionPriority=0,
-						mirror=mirrorList[i],
-						name=self.names.get('lipCtrl', 'rnm_lipCtrl'), shape=fkShapes[i],
-						par=controlGroup,
-						ctrlParent=controlGroup,
-						jntBuf=False)
 
-					self.lipCtrls.append(lipCtrl)
+			self.lipCtrls = []
+			# For each joint, create a control
+			for i, jnt in enumerate(jointsList):
 
-				leftLipJnt, topLipJnt, rightLipJnt, botLipJnt = jointsList # TODO: determine in some other way?
-				leftLipCtrl, topLipCtrl, rightLipCtrl, botLipCtrl = self.lipCtrls # TODO: determine in some other way?
+				lipCtrl = self.createControlHeirarchy(
+					transformSnap = jnt,
+					selectionPriority=0,
+					mirrorStart=mirrorList[i],
+					mirror=mirrorList[i],
+					name=self.names.get('lipCtrl', 'rnm_lipCtrl'),
+					shape=shapes[i],
+					par=controlGroup,
+					ctrlParent=controlGroup,
+					jntBuf=False)
 
-				#=========================== Bezier Setup =================================
-				print jointsList[:2]
-				bezierRigGroup0 = self.buildBezierSetup(
-					transforms=[leftLipJnt, topLipJnt, rightLipJnt],
-					ctrlTransforms=[leftLipCtrl, topLipCtrl, rightLipCtrl],
-					shapes=fkShapes,
-					follow=True,
+				self.lipCtrls.append(lipCtrl)
+
+
+			baseLipJnt, leftLipJnt, topLipJnt, rightLipJnt, botLipJnt = jointsList # TODO: determine in some other way?
+			baseLipCtrl, leftLipCtrl, topLipCtrl, rightLipCtrl, botLipCtrl = self.lipCtrls # TODO: determine in some other way?
+
+			#=========================== Bezier Setup =================================
+		
+			jointGroupings = [[leftLipJnt, topLipJnt, rightLipJnt], [leftLipJnt, botLipJnt, rightLipJnt]]
+			ctrlGroupings = [[leftLipCtrl, topLipCtrl, rightLipCtrl], [leftLipCtrl, botLipCtrl, rightLipCtrl]]
+			bezierRigGroups = []
+			crvs = []
+			for i in range(2):
+				bezierRigGroup = self.buildBezierSetup(
+					transforms=jointGroupings[i],
+					ctrlTransforms=ctrlGroupings[i],
+					follow=False,
 					twist=True,
 					bias=False,
 					twistAxisChoice=0,
@@ -187,66 +163,46 @@ class lips(buildRig.rig):
 					mirror=False,
 					bezChain=True, # ?
 					)
-				self.bendVis.connect(bezierRigGroup0.controlsVis)
-				self.rigNode.tangentsDistanceScaling.connect(bezierRigGroup0.tangentsDistanceScaling)
-		
+				self.rigNode.tangentsDistanceScaling.connect(bezierRigGroup.tangentsDistanceScaling)
+				bezierRigGroups.append(bezierRigGroup)
+				crvs.append(bezierRigGroup.curve.get())
 
-				# bezierRigGroup1 = self.buildBezierSetup(
-				# 	transforms=[leftLipJnt, botLipJnt, rightLipJnt],
-				# 	ctrlTransforms=[leftLipCtrl, botLipCtrl, rightLipCtrl],
-				# 	shapes=fkShapes,
-				# 	follow=True,
-				# 	twist=True,
-				# 	bias=False,
-				# 	twistAxisChoice=0,
-				# 	doNeutralize=True,
-				# 	mirror=False,
-				# 	bezChain=True, # ?
-				# 	)
-				# self.bendVis.connect(bezierRigGroup1.controlsVis)
-				# self.rigNode.tangentsDistanceScaling.connect(bezierRigGroup1.tangentsDistanceScaling)
-				
 				for ctrl in self.bendCtrls:
 					ctrl.neutralize.set(1)
 					ctrl.magnitude.set(1)
 
 
-				#=========================== Bend Setup =================================
-				# bendRigGroup = self.buildMidBendCurveSetup(transforms=self.fkCtrls, follow=True, shapes=ikShapes, controller=self.rigNode, mirror=mirror)
+			print crvs
+			# =========================== CurvePath =================================
+			# create a result curve based on the postion on both curve inputs
 
-				# =========================== CurvePath =================================
-				print numJointsList
-				print bezierRigGroup0.uValues.get()
+			# blendCurve0 = duplicate(crvs[0], n=self.names.get('blendCurve0', 'rnm_blendCurve0'), rc=True)
+			# self.step(blendCurve0, 'blendCurve0')
+
+			# curveBS = blendShape(crvs[1], crvs[0])
+
+			# raise
 				
-				if self.dev:
-					print 'Control uValues:'
-					print bezierRigGroup0.uValues.get()
-					print 'NumJointsList: %s' % numJointsList
-				
-				crvPathRig0 = self.buildCurvePartitionsSetup(
-					self.crvs[0], 
-					partitionParams=bezierRigGroup0.uValues.get(),
+			# =========================== CurvePath Rig =================================
+			crvPathRigs = []
+			for i in range(2):
+
+				crvPathRig = self.buildCurvePartitionsSetup(
+					crvs[i], 
+					partitionParams=bezierRigGroups[i].uValues.get(),
 					numJointsList=numJointsList,
 					mirror=False,
 					createOffsetControls=True,
 					rotationStyle='curve',
 					twist=True
 				)
-				results = crvPathRig0.results.get()
-				self.offsetsVis.connect(crvPathRig0.v)
-
-				for i in range(len(self.bendCtrls)):
-					# addAttr(crvPathRig0, ln='partitionParameters', multi=True, numberOfChildren=3, k=1)
-					print '\n'
-					print bezierRigGroup0
-					print bezierRigGroup0.attr('uValues%s' % i)
-					print bezierRigGroup0.attr('uValues%s' % i).get()
-					print crvPathRig0
-					print crvPathRig0.attr('partitionParameter%s' % i)
-					print crvPathRig0.attr('partitionParameter%s' % i).get()
-					print '\n'
-					bezierRigGroup0.attr('uValues%s' % i).connect(crvPathRig0.attr('partitionParameter%s' % i))
-
+				crvPathRigs.append(crvPathRig)
+				results = crvPathRig.results.get()
+				self.offsetsVis.connect(crvPathRig.v)
+				for j in range(3):
+					bezierRigGroups[i].attr('uValues%s' % j).connect(crvPathRig.attr('partitionParameter%s' % j))
+				
+				
 				print 'LEN'
 				print len(self.twistAdds)
 				print len(self.bendCtrls)
@@ -294,22 +250,23 @@ class lips(buildRig.rig):
 
 
 
-			#=========================== Finalize =================================
-			finally:
-				try:
-					self.setController(bezierRigGroup, self.rigGroup)
-					self.setController(crvPathRig, self.rigGroup)
-				except:
-					pass
-				try:
-					self.constructSelectionList(selectionName='bendCtrls', selectionList=self.bendCtrls)
-					self.constructSelectionList(selectionName='tangentCtrls', selectionList=self.tangentCtrls)
-					self.constructSelectionList(selectionName='offsetCtrls', selectionList=self.offsetCtrls)
-					self.constructSelectionList(selectionName='frozenNodes', selectionList=self.freezeList)
-				except:
-					pass
+		#=========================== Finalize =================================
+		finally:
+			try:
+				self.setController(bezierRigGroups[0], self.rigGroup)
+				self.setController(bezierRigGroups[1], self.rigGroup)
+				self.setController(crvPathRig, self.rigGroup)
+			except:
+				pass
+			try:
+				self.constructSelectionList(selectionName='bendCtrls', selectionList=self.bendCtrls)
+				self.constructSelectionList(selectionName='tangentCtrls', selectionList=self.tangentCtrls)
+				self.constructSelectionList(selectionName='offsetCtrls', selectionList=self.offsetCtrls)
+				self.constructSelectionList(selectionName='frozenNodes', selectionList=self.freezeList)
+			except:
+				pass
 
-				self.finalize()
+			self.finalize()
 
 	def naming0(self, i=0, n=0):
 		try:
