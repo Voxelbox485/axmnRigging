@@ -1458,8 +1458,6 @@ class fitSkeleton:
 		for jnt in jointsList:
 			self.initializeSkeleJoint(jnt)
 
-
-
 	def skeleInitFromFile(self):
 		'''
 		Potential start for future csv skeleton reader (just save and import it for now)
@@ -1577,7 +1575,6 @@ class fitSkeleton:
 
 		return bone
 
-
 	def updateSkeleJoint(self, bone):
 
 		#Color
@@ -1677,8 +1674,6 @@ class fitSkeleton:
 		for sym in self.skeleNode.symmetryConstraints.get():
 			parent(sym, self.skeleNode.symmetryGroup.get())
 
-			
-	
 	def autoHeirarchy(self):
 		self.fitHeir =  self.skeleNode.fitHeirarchy.get()
 		self.fitRigs =  self.skeleNode.fitRigsList.get()
@@ -1863,8 +1858,6 @@ class fitSkeleton:
 		# delete(transList)
 		# delete(aimAtList)
 
-
-
 	def buildOrientUpObject(self):
 		selection = ls(sl=1)
 
@@ -1914,7 +1907,6 @@ class fitSkeleton:
 		delete(constList)
 		
 		select(trans)
-
 
 	def outputSkeleton(self):
 		# Creates a single joint heirarchy based on combining all bind joints in each subrig
@@ -2378,7 +2370,7 @@ class fitRig:
 		self.fitHeirarchy = self.skeleNode.fitHeirarchy.get()
 
 
-		# Initiate fitnode if existing fitnoe not specified
+		# Initiate fitnode if existing fitnode not specified
 		if fitNode is None:
 			if rigType is None:
 				raise Exception('No data specified.')

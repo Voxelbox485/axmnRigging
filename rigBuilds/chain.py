@@ -217,7 +217,7 @@ class chain(buildRig.rig):
 							self.fkCtrls = []
 							self.fkCtrls.append(ctrl)
 
-						fkVisMult.o.connect(ctrl.getShapes()[0].v)
+						if ctrl.getShapes(): fkVisMult.o.connect(ctrl.getShapes()[0].v)
 						self.socket(ctrl).message.connect(self.rigNode.socketList, na=1)
 
 					if self.dev:

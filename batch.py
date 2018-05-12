@@ -7,11 +7,10 @@ from copy import deepcopy
 '''
 
 TODO
-workspace control 
-load outputs/inputs based on field
+workspace control
+load outputs/inputs based on current textlists
 Print all data about attribute selected?
 
-TEST When using Insert Nodes, replace destination nodes with insert nodes, and cut and paste destination list to NEXT history window.
 
 Context specific marking menus (Within node editor)
 http://bindpose.com/custom-marking-menu-maya-python/
@@ -48,7 +47,7 @@ class axmn_batch:
 	gNodeEditor = 		mel.getCurrentNodeEditor()
 	
 
-	def __init__(self, dev=False):
+	def __init__(self, dev=True):
 		'''Initializes class attributes and UI'''
 		# ============================================ SCRIPT SETTINGS ==================================================== 
 		self.dev = dev
@@ -67,6 +66,7 @@ class axmn_batch:
 
 		# Defaults
 		self.writeInMode = 'attributes' #default writein setting ('attributes' or 'nodes')
+		self.useNodeNames = False
 		self.autoSorted = False
 		self.useShortNames = False
 		self.searchSelected = False
@@ -111,6 +111,7 @@ class axmn_batch:
 		# 	if versions.current() > versions.v2017:
 		# 		self.dockUI = False
 		# 		self.workspaceUI = True
+
 		self.unhiddenAttributes = [] # cbShowAll stores here
 
 		# History
@@ -129,11 +130,8 @@ class axmn_batch:
 
 		if versions.current() > versions.v2017:
 			if workspaceControl(self.workspace, exists=True):
-				try:
-					workspaceControl(self.workspace, close=True)
-					deleteUI(self.workspace, control=True)
-				except:
-					warning('Workspace found, but could not be deleted')
+				deleteUI(self.workspace, control=True)
+				workspaceControl(self.workspace, close=True)
 
 		if window(self.win, exists=True):
 			deleteUI(self.win)
@@ -149,8 +147,11 @@ class axmn_batch:
 		# Workspace
 
 		if versions.current() > versions.v2017:
+
 			if self.workspaceUI:
-				self.workspace = workspaceControl(self.workspace, retain=False, floating=True, tabToControl=[self.gWSElement, -1], wp="preferred", mw=420, uiScript=self.win)
+				print 'got here'
+				self.workspace = workspaceControl(name=self.workspace, retain=False, floating=True, tabToControl=[self.gWSElement, -1], wp="preferred", mw=420, uiScript=self.UI)
+				print 'and here'
 			
 		# Dock
 		if self.dockUI:
@@ -424,7 +425,9 @@ class axmn_batch:
 										annotation = '%s %s List' % (leftRightString[i], upDownString[j]),
 										selectCommand=Callback(self.itemSelect, q),
 										doubleClickCommand=Callback(self.selectItemInList, q),
-										deleteKeyCommand=Callback(self.removeItems, q)
+										deleteKeyCommand=Callback(self.removeItems, q),
+										dragCallback=Callback(self.dragObjects, q),
+										dropCallback = Callback(self.dropObjects, q)
 									)
 									
 									self.textLists.append(objectList)
@@ -511,12 +514,11 @@ class axmn_batch:
 		autoCompleteMenuColumn = horizontalLayout()
 		with autoCompleteMenuColumn:
 
-			writeIn = textField(
+			self.writeIn = textField(
 				alwaysInvokeEnterCommandOnReturn = True,
 				annotation = 'Manual Input',
 				height = 25,
 				)
-			self.writeIn = writeIn
 
 			writeInMenu = self.autoCompleteWriteInPopup(self.writeIn)
 
@@ -559,6 +561,16 @@ class axmn_batch:
 			
 		self.stackHorizontalLayout(autoCompleteMenuColumn)
 
+		# attrNodesModeButtonRow = verticalLayout()
+		# with attrNodesModeButtonRow:
+		# 	self.attrModeButton = iconTextButton(
+		# 		l='Attributes',
+		# 		c=Callback(self.clearWriteIn)
+		# 		)
+		# 	self.nodeModeButton = iconTextButton(
+		# 		l='Attributes',
+		# 		c=Callback(self.clearWriteIn)
+		# 		)
 
 		self.resultListExpandButton = button(
 			height = 10,
@@ -570,23 +582,107 @@ class axmn_batch:
 		resultListColumn = horizontalLayout()
 		with resultListColumn:
 
-
 			self.AC_resultList = textScrollList(
 				height=25,
 				allowMultiSelection = True,
 				annotation = 'Autocomplete List',
 				font = 'fixedWidthFont',
 				doubleClickCommand=Callback(self.selectItemInList, 4),
-				visible=False
+				visible=False,
+				dragCallback=Callback(self.dragAutoCompleteResults)
 				)
 			self.textLists.append(self.AC_resultList)
 
 			autoCompleteMenu = self.autoCompleteListPopup(self.AC_resultList)
 		# self.stackHorizontalLayout(resultListColumn)
-		# Auto Complete right-click window
 		
-		writeIn.changeCommand(Callback(self.autoComplete))
-		writeIn.enterCommand(Callback(self.autoComplete))
+		# Auto Complete right-click window
+		self.writeIn.changeCommand(Callback(self.autoComplete))
+		self.writeIn.enterCommand(Callback(self.autoComplete))
+
+	def dragAutoCompleteResults(self):
+
+		print '\t #dragAutoCompleteResults'
+		# When middleclick dragging, assign objects selected to a list and assign inputs to determine whether the results will be valid
+		# Reset object list
+		self.dragging = []
+		# if self.dev: 
+		# 	print self.dragging
+		# When dragging from ac list, make sure results are placed correctly by assigning the dragIndex to values just outside the normal range.
+		# That way, drop context will still trigger normally, but check value in place to prevent removeItems from triggering.
+		if self.writeInMode == 'nodes':
+			self.dragIndex = -1
+		elif self.writeInMode == 'attributes':
+			self.dragIndex = 4
+
+		for item in self.AC_resultList.getSelectItem():
+			self.dragging.append(item)
+		# print self.dragging
+
+	def dragObjects(self, listIndex):
+		print '\t #dragObjects'
+		# Reset object list
+		self.dragging = []
+		# Assign pointer value for drop command
+		self.dragIndex = listIndex
+
+		# TODO Crazy code alert
+		# This converts the index provided by textScrollList's getSelectIndexedItem into accurate list of indices actually useable by python 
+		itemsIndexList = self.convertIndex(self.textLists[listIndex].getSelectIndexedItem())
+
+		# We use it to lookup the class data and append those items to the list, rather than the string outputs from the textlist
+		for index in itemsIndexList:
+			self.dragging.append(self.itemLists[self.hIndex][listIndex][index])
+		print self.dragging
+		return self.dragging
+
+	def dropObjects(self, listIndex):
+		print '\t #dropObjects'
+
+		# If nodes list, and not dropping in the same list 
+		if listIndex < 2 and self.dragIndex < 2 and listIndex != self.dragIndex:
+			
+			# print 'DragIndex: %s' % self.dragIndex
+			# print 'DropIndex: %s' % listIndex
+			print 'Adding     %s' % self.dragging
+			
+			# Add items in dragging list, return names that failed
+			warnList = self.addItems(listIndex=listIndex, items=self.dragging, strict=False)
+			# print 'warnList:  %s' % warnList
+			
+			# if not autocomplete list
+			if not self.dragIndex == -1:
+				
+				# Cull selected items in source list
+				# print "Removing:      %s " % self.dragging
+				# for item in self.dragging:
+				# 	if item in warnList:
+				# 		self.dragging.remove(item)
+				# print "After Culling: %s " % self.dragging
+				
+				for item in self.dragging:
+					if item in warnList:
+						self.textLists[self.dragIndex].deselectItem(item)
+
+				# removeItems really works best on selection. deselect objects by node here?
+				self.removeItems(listIndex=self.dragIndex, warn=False)
+
+		elif listIndex >= 2 and self.dragIndex >= 2 and listIndex != self.dragIndex:
+			
+			warnList = self.addItems(listIndex=listIndex, items=self.dragging, strict=False)
+			print 'warnList: %s' % warnList
+			if not self.dragIndex == 4:
+
+				for item in self.dragging:
+					if item in warnList:
+						self.textLists[self.dragIndex].deselectItem(item)
+
+				self.removeItems(listIndex= self.dragIndex)
+
+
+		self.dragging = []
+
+
 
 	def commandsFrameUI(self):
 		# standardCommandsColor = 	(0.45,0.45,0.45)
@@ -838,16 +934,16 @@ class axmn_batch:
 				l='Nodes Mode',
 				c=Callback(self.autoListTypeToggle),
 				)
+			self.searchSelectedAutoCompleteMenu = menuItem(
+				l='Query Nodes Selected',
+				c=Callback(self.searchSelectedToggle),
+				)
 		return menu
 
 
 	def autoCompleteListPopup(self, parent):
 		menu = popupMenu(p=parent)
 		with menu:
-			self.searchSelectedAutoCompleteMenu = menuItem(
-				l='Query Nodes Selected',
-				c=Callback(self.searchSelectedToggle),
-				)
 			self.selectAllAutoCompleteMenu = menuItem(
 				l='Select All',
 				c=Callback(self.selectAllItemsInAutoCompleteList),
@@ -1814,7 +1910,7 @@ class axmn_batch:
 	# -------------------- TextList Construction --------------------
 
 
-	def updateLists(self, devPrint=True):
+	def updateLists(self, devPrint=True, warn=False):
 		'''Updates textScrollList ui with python lists
 		pymel.PyNode("name")
 		'''
@@ -1823,11 +1919,11 @@ class axmn_batch:
 
 		# =================== Print Info ==================
 		if self.dev:
-			if devPrint:
-				for i, h in enumerate(self.itemLists):
-					print i
-					for itemList in h:
-						print itemList
+			# if devPrint:
+			for i, h in enumerate(self.itemLists):
+				print i
+				for itemList in h:
+					print itemList
 
 
 		# =================== Check Data ==================
@@ -1843,11 +1939,15 @@ class axmn_batch:
 		# For each list, empty and replace ui contents with class info, then reselect items in previous selection
 		# from inner list
 		# [ [],[],[],[] ]
+		i=0
 		for tl, il in zip(self.textLists, self.itemLists[self.hIndex]):
 			selection = tl.getSelectItem()
 			tl.removeAll()
-			tl.append(il)
-				
+			if i<2 and self.useNodeNames:
+				for item in il:
+					tl.append(item.nodeName())
+			else:
+				tl.append(il)
 
 			# Check python instance type to warn me whenever incorrect nodeTypes are entered
 			# Doesnt work for some reason
@@ -1865,6 +1965,8 @@ class axmn_batch:
 			for sel in selection:
 				if sel in tl.getAllItems():
 					tl.setSelectItem(sel)
+
+			i=i+1	
 
 	def checkExists(self):
 		if self.dev: print '\ncheckExists'
@@ -1884,7 +1986,7 @@ class axmn_batch:
 						else:
 							raise Exception('Item in list is not a pyNode instance: %s' % node)
 				
-	def addItems(self, listIndex, items=None):
+	def addItems(self, listIndex, items=None, strict=False):
 		if self.dev: print '\naddItems'
 		# Click 'Add' Button
 
@@ -1898,25 +2000,33 @@ class axmn_batch:
 
 		selection = ls(sl=1)
 		warnList = []
-		items = []
+
+		
+		dragAndDrop = False if items is None else True
+
+		# if items is None:
+		# 	items = []
 
 		# TODO
 		# Mouse-drag attributes to a textlist?
 
-		# If populating node list, use either autoComplete or node selection
+		# If populating node list use original input if specified, else autocomplete list if selected, or node selection
 		selectedAC = self.getSelectedInAutoComplete()
 		
-		if listIndex <= 1:
-
-			if selectedAC and self.writeInMode == 'nodes':
+		if listIndex <= 1: # If nodes
+			# If items list specified in inputs, just use that value
+			if dragAndDrop:
+				pass
+			elif selectedAC and self.writeInMode == 'nodes':
 				items = selectedAC
-
 			else:
 				items = selection
 
 
-		# If populating attributes list, use autoComplete OR channel selection
+		# If populating attributes list, use original input if specified, autoComplete if selected, or channel selection
 		else:
+			if dragAndDrop:
+				pass
 			if selectedAC and self.writeInMode == 'attributes':
 					items = selectedAC
 
@@ -1944,9 +2054,11 @@ class axmn_batch:
 		# If list is empty
 		if not items:
 			if listIndex <= 1:
-				raise Exception('No nodes selected.')
+				if not dragAndDrop:
+					raise Exception('No nodes selected.')
 			else:
-				raise Exception('No attributes selected.')
+				if not dragAndDrop:
+					raise Exception('No attributes selected.')
 
 		# Test each item
 		newItemsList = []
@@ -1972,11 +2084,14 @@ class axmn_batch:
 		self.updateLists()
 
 		if len(warnList):
-			warning('Object(s) already in list: %s' % warnList)
-		
+			if strict:
+				raise Exception('Object(s) already in list: %s' % warnList)
+			else:
+				warning('Object(s) already in list: %s' % warnList)
 
 
 		select(selection)
+		return warnList
 
 	def addNodesAndAttributes(self, listIndex):
 		if self.dev: print '\naddNodesAndAttributes'
@@ -2024,13 +2139,18 @@ class axmn_batch:
 		else:
 			self.clearWindow()
 		
-	def removeItems(self, listIndex):
+	def removeItems(self, listIndex, items=None, warn=True):
+		# TODO implement items input to facilitate drag and drop transfer.
+		# might need to assume supplied items will be pynodes, else it probably won't work in nameclash situations
 		if self.dev: print '\nremoveItems'
 		# Click 'Remove' button
 		textList = self.textLists[listIndex]
 		itemList = self.itemLists[self.hIndex][listIndex]
+		# if not items is None:
+
 		selIndex = self.convertIndex(textList.getSelectIndexedItem())
 		removed = []
+
 		if selIndex:
 			# Reverse direction so indcies don't change each iteration
 			selIndex.reverse()
@@ -2038,10 +2158,11 @@ class axmn_batch:
 				removed.append(itemList[index])
 				itemList.remove(itemList[index])
 		else:
-			warning('No items in list selected.')
+			if warn:
+				warning('No items in list selected.')
 			textList.setSelectItem()
 		if self.dev: print 'Removed items: %s' % removed
-		self.updateLists()
+		self.updateLists(warn=warn)
 
 	def removeAllItems(self, listIndex, histIndex=None):
 		if self.dev: print '\nremoveAllItems'
@@ -2066,10 +2187,12 @@ class axmn_batch:
 		
 			if listIndex == 0 or listIndex == 1:
 				selIndex = self.convertIndex(textList.getSelectIndexedItem())
-				if self.dev: print type(itemList[selIndex[0]])
+				print type(itemList[selIndex[0]])
 				select(itemList[selIndex[0]])
+
 			if listIndex == 2 or listIndex == 3:
 				self.writeIn.setText(textList.getSelectItem()[-1])
+				print textList.getSelectItem()[-1]
 				self.autoComplete()
 
 			self.updateLists()
@@ -2079,8 +2202,9 @@ class axmn_batch:
 			itemList = self.autoCompleteList
 			selIndex = self.convertIndex(textList.getSelectIndexedItem())
 
-			if self.dev: print type(itemList[selIndex[0]])
-			select(itemList[selIndex[0]])
+			if self.writeInMode == 'nodes':
+				print type(itemList[selIndex[0]])
+				select(itemList[selIndex[0]])
 
 	def selectAllItemsInList(self, listIndex):
 		# Double-click 'Add' button
@@ -2449,8 +2573,6 @@ class axmn_batch:
 		a menu
 		'''
 
-		# Get current text
-		text = self.writeIn.getText()
 		# In case this has to change
 		resList = self.textLists[4]
 
@@ -2461,101 +2583,108 @@ class axmn_batch:
 		self.sortedAutoCompleteList = []
 		waitCursor( state=True )
 
+
 		# If write-in field isn't empty
-		if text:
+		if self.writeIn.getText():
+			# Get current text
+			texts = [self.writeIn.getText()]
+			texts = self.writeIn.getText().split(',')
+
+			for text in texts:
+				text = text.strip() # Remove outer whitespaces
+
+				# text.replace(" ", "")
+				# auto complete mode (attributes or nodes)
+				if self.writeInMode == 'attributes':
+
+					# Combine selection, and nodeLists into a larger list
+					# Construct a list of nodes to check.  (Selection, Src Node List, Dest Node List)
+					nodes = []
+
+					if self.searchSelected:
+						nodes = ls(sl=1)
+
+					else:
+						for item in self.itemLists[self.hIndex][0]:
+							if item not in nodes:
+								nodes.append(item)
+
+						for item in self.itemLists[self.hIndex][1]:
+							if item not in nodes:
+								nodes.append(item)
 
 
-			# auto complete mode (attributes or nodes)
-			if self.writeInMode == 'attributes':
+					if len(nodes):
+						for node in nodes:
+							# retrive list of attributes from nodes based on text
+							attrList = listAttr(node, st=text, sn=self.useShortNames)
+							
+							# For ease of use, assume wildcards unless specific wildcard already specified
+							if '*' not in text:
+								searchListText = [
+								'%s*' % text,
+								# '*%s'  % text,
+								# '*%s*' % text,
+								]
+								# For each list
+								for i in range(len(searchListText)):
+									# Retrieve lists
+									searchList = listAttr(node, st=searchListText[i], sn=self.useShortNames)
+									# If items found
+									if len(searchList):
 
-				# Combine selection, and nodeLists into a larger list
-				# Construct a list of nodes to check.  (Selection, Src Node List, Dest Node List)
-				nodes = []
+										prunedList = []
+										for item in searchList:
 
-				if self.searchSelected:
-					nodes = ls(sl=1)
+											if item not in attrList:
+												prunedList.append(item)
 
-				else:
-					for item in self.itemLists[self.hIndex][0]:
-						if item not in nodes:
-							nodes.append(item)
+										if len(prunedList):
+											searchList = prunedList
+											# If there's any data in list so far, add a divider
+											if len(attrList) > 0:
+												attrList.append(self.AC_divider)
 
-					for item in self.itemLists[self.hIndex][1]:
-						if item not in nodes:
-							nodes.append(item)
-
-
-				if len(nodes):
-					for node in nodes:
-						# retrive list of attributes from nodes based on text
-						attrList = listAttr(node, st=text, sn=self.useShortNames)
-						
-						# For ease of use, assume wildcards unless specific wildcard already specified
-						if '*' not in text:
-							searchListText = [
-							'%s*' % text,
-							# '*%s'  % text,
-							# '*%s*' % text,
-							]
-							# For each list
-							for i in range(len(searchListText)):
-								# Retrieve lists
-								searchList = listAttr(node, st=searchListText[i], sn=self.useShortNames)
-								# If items found
-								if len(searchList):
-
-									prunedList = []
-									for item in searchList:
-
-										if item not in attrList:
-											prunedList.append(item)
-
-									if len(prunedList):
-										searchList = prunedList
-										# If there's any data in list so far, add a divider
-										if len(attrList) > 0:
-											attrList.append(self.AC_divider)
-
-										attrList.extend(searchList)
+											attrList.extend(searchList)
 
 
-						for att in attrList:
-							if att not in self.defaultAutoCompleteList:
-								self.defaultAutoCompleteList.append(att)
+							for att in attrList:
+								if att not in self.defaultAutoCompleteList:
+									self.defaultAutoCompleteList.append(att)
 
 
-			elif self.writeInMode == 'nodes':
-				nodeList = ls(text, recursive=True, objectsOnly=True)
-				
-				if '*' not in text:
+				elif self.writeInMode == 'nodes':
+					nodeList = ls(text, recursive=True, objectsOnly=True)
+					
+					if '*' not in text:
 
-					searchListText = [
-					'%s*' % text,
-					# '*%s'  % text,
-					# '*%s*' % text,
-					]
+						searchListText = [
+						'%s*' % text,
+						# '*%s'  % text,
+						# '*%s*' % text,
+						]
 
-					for i in range(len(searchListText)):
-						# Retrieve lists
-						searchList = ls('%s' % searchListText[i], head=self.lsLimit, recursive=True, objectsOnly=True)
+						for i in range(len(searchListText)):
+							# Retrieve lists
+							searchList = ls('%s' % searchListText[i], head=self.lsLimit, recursive=True, objectsOnly=True)
 
-						if len(searchList):
-							prunedList = []
-							for item in searchList:
-								if item not in nodeList:
-									prunedList.append(item)
+							if len(searchList):
+								prunedList = []
+								for item in searchList:
+									if item not in nodeList:
+										prunedList.append(item)
 
-							if len(prunedList):
-								searchList = prunedList
-								# If there's any data in list so far, add a divider
-								if len(nodeList) > 0:
-									nodeList.append(self.AC_divider)
+								if len(prunedList):
+									searchList = prunedList
+									# If there's any data in list so far, add a divider
+									if len(nodeList) > 0:
+										nodeList.append(self.AC_divider)
 
-								nodeList.extend(searchList)
+									nodeList.extend(searchList)
 
-				print 'Nodes: %s' % len(nodeList)
-				for node in nodeList:
-					self.defaultAutoCompleteList.append(node)
+					print 'Nodes: %s' % len(nodeList)
+					for node in nodeList:
+						self.defaultAutoCompleteList.append(node)
 
 
 		# TODO
@@ -2592,6 +2721,7 @@ class axmn_batch:
 			menuItem(self.unhideAutoCompleteMenu, e=1, en=1)
 			menuItem(self.sortAutoCompleteMenu, e=1, en=1)
 			menuItem(self.shortAutoCompleteMenu, e=1, en=1)
+			menuItem(self.searchSelectedAutoCompleteMenu, e=1, en=1)
 		else:
 			self.writeInMode = 'nodes'
 			menuItem(self.modeAutoCompleteMenu,
@@ -2601,6 +2731,7 @@ class axmn_batch:
 			menuItem(self.unhideAutoCompleteMenu, e=1, en=0)
 			menuItem(self.sortAutoCompleteMenu, e=1, en=0)
 			menuItem(self.shortAutoCompleteMenu, e=1, en=0)
+			menuItem(self.searchSelectedAutoCompleteMenu, e=1, en=0)
 
 
 		self.autoComplete()
@@ -2623,13 +2754,11 @@ class axmn_batch:
 		if self.dev: print '\nsearchSelectedToggle'
 
 		self.searchSelected = not self.searchSelected
-		if self.useShortNames:
-			menuItem(self.searchSelectedAutoCompleteMenu, e=1, l='Query Nodes Selected')
-		else:
+		if self.searchSelected:
 			menuItem(self.searchSelectedAutoCompleteMenu, e=1, l='Query Nodes In Lists')
-
+		else:
+			menuItem(self.searchSelectedAutoCompleteMenu, e=1, l='Query Nodes Selected')
 		self.autoComplete()
-
 
 	def clearWriteIn(self):
 		self.writeIn.setText('')

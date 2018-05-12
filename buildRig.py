@@ -168,6 +168,7 @@ class rig:
 
 	useProgressBar = False
 	doAssetize = False
+	publishFitNode = False
 
 	sideStr = ['_M', '_L', '_R', '']
 
@@ -395,9 +396,9 @@ class rig:
 		# Settings Node
 		if not skipAssetize:
 			if self.doAssetize:
-					self.assetize(publishFitNode=True)
-			else:
-				self.attachRigNode()
+					self.assetize(publishFitNode = False)
+		
+		self.attachRigNode()
 
 		# RigNode Set
 		if not objExists('rigNodeSet'):
@@ -3285,13 +3286,23 @@ class rig:
 
 
 						# bend control neutralize (to rotation)
-						neutralBlend = createNode('blendColors', n=self.names.get('neutralBlend', 'rnm_neutralBlend'))
-						aimTransforms[q].rotate.connect(neutralBlend.color1)
-						neutralBlend.color2.set(0,0,0)
-						neutralizeTangentBlend.output >> neutralBlend.blender
+						# neutralBlend = createNode('blendColors', n=self.names.get('neutralBlend', 'rnm_neutralBlend'))
+						# aimTransforms[q].rotate.connect(neutralBlend.color1)
+						# neutralBlend.color2.set(0,0,0)
+						# neutralizeTangentBlend.output >> neutralBlend.blender
+						# neutralBlend.output >> tangents[q].const.get().rotate
+						# self.step(neutralBlend, 'neutralBlend')
+
+
+						# bend control neutralize (to rotation)
+						neutralBlend = createNode('animBlendNodeAdditiveRotation', n=self.names.get('neutralBlend', 'rnm_neutralBlend'))
+						aimTransforms[q].rotate.connect(neutralBlend.inputB)
+						neutralBlend.inputA.set(0,0,0)
+						neutralizeTangentBlend.output >> neutralBlend.weightA
 						neutralBlend.output >> tangents[q].const.get().rotate
 						self.step(neutralBlend, 'neutralBlend')
 
+						
 
 						
 
